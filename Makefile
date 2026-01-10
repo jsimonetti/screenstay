@@ -41,7 +41,7 @@ info-plist:
 	@printf '    <key>CFBundleVersion</key>\n    <string>1</string>\n' >> $(APP_BUNDLE)/Contents/Info.plist
 	@printf '    <key>LSMinimumSystemVersion</key>\n    <string>15.0</string>\n' >> $(APP_BUNDLE)/Contents/Info.plist
 	@printf '    <key>LSUIElement</key>\n    <true/>\n' >> $(APP_BUNDLE)/Contents/Info.plist
-	@printf '    <key>NSHumanReadableCopyright</key>\n    <string>Copyright © 2026 Simonetti</string>\n' >> $(APP_BUNDLE)/Contents/Info.plist
+	@printf '    <key>NSHumanReadableCopyright</key>\n    <string>MIT Licensed</string>\n' >> $(APP_BUNDLE)/Contents/Info.plist
 	@printf '    <key>NSPrincipalClass</key>\n    <string>NSApplication</string>\n' >> $(APP_BUNDLE)/Contents/Info.plist
 	@printf '</dict>\n</plist>\n' >> $(APP_BUNDLE)/Contents/Info.plist
 

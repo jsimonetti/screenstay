@@ -12,7 +12,7 @@ SOURCES = $(shell find ScreenStay -name "*.swift")
 ENTITLEMENTS = ScreenStay/ScreenStay.entitlements
 SIGNING_IDENTITY = "screenstay-codesign-certificate"
 
-.PHONY: all build clean run install
+.PHONY: all build clean run install sign
 
 all: build
 
@@ -23,6 +23,8 @@ $(APP_BUNDLE): $(SOURCES)
 	@mkdir -p $(APP_BUNDLE)/Contents/Resources
 	@$(MAKE) --no-print-directory info-plist
 	@$(SWIFTC) -o $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME) $(SWIFT_FLAGS) $(SOURCES)
+
+sign: $(APP_BUNDLE)
 	@codesign --force --sign $(SIGNING_IDENTITY) --identifier $(BUNDLE_ID) --entitlements $(ENTITLEMENTS) --options runtime $(APP_BUNDLE)
 
 info-plist:
@@ -50,5 +52,5 @@ run: build
 	@open $(APP_BUNDLE)
 
 install: build
-	@rm -rf /Applications/$(APP_NAME).app
-	@cp -R $(APP_BUNDLE) /Applications/
+	@rm -rf ~/Applications/$(APP_NAME).app
+	@cp -R $(APP_BUNDLE) ~/Applications/

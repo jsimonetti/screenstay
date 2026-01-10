@@ -55,6 +55,61 @@ ScreenStay identifies display configurations using a position-independent finger
 - Accessibility permissions (required for window management)
 - Input Monitoring permissions (required for keyboard shortcuts)
 
+## Building and Signing
+
+### Building from Source
+
+Build the application using the included Makefile:
+
+```bash
+make build
+```
+
+This compiles the Swift sources and creates the application bundle in `build/ScreenStay.app`.
+
+Other available targets:
+
+```bash
+make clean      # Remove build artifacts
+make run        # Build and launch the application
+make install    # Build and copy to /Applications
+```
+
+### Code Signing
+
+macOS requires applications to be signed to run without security warnings. The Makefile includes a signing target.
+
+To sign the application with your own certificate:
+
+```bash
+# Find your signing identity
+security find-identity -v -p codesigning
+
+# Sign using the Makefile
+make sign SIGNING_IDENTITY="YOUR_IDENTITY"
+```
+
+### Custom Build Configuration
+
+For personal build settings, create a `Makefile.local` to override defaults:
+
+```makefile
+SIGNING_IDENTITY = "Apple Development: Your Name (TEAM_ID)"
+
+.PHONY: all
+
+all:
+	@$(MAKE) clean
+	@$(MAKE) build
+	@$(MAKE) sign SIGNING_IDENTITY='$(SIGNING_IDENTITY)'
+```
+
+Then build and sign with:
+
+```bash
+make -f Makefile.local
+```
+
 ## Configuration
 
 Configuration is stored in JSON format at:

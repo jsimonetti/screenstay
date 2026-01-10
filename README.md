@@ -123,4 +123,4 @@ When you trigger a keyboard shortcut assigned to a region, ScreenStay cycles foc
 
 ## License
 
-Copyright 2026. All rights reserved.
+MIT License. See LICENSE file for details.

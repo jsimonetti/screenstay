@@ -1,0 +1,539 @@
+{
+  "globalSettings" : {
+    "enableAutoProfileSwitch" : true,
+    "repositionOnAppLaunch" : true,
+    "repositionOnDisplayChange" : true,
+    "requireConfirmToLaunchApps" : false
+  },
+  "profiles" : [
+    {
+      "displayTopology" : {
+        "displays" : [
+          {
+            "displayID" : 3,
+            "isBuiltIn" : false,
+            "position" : [
+              0,
+              0
+            ],
+            "resolution" : [
+              5120,
+              1440
+            ]
+          },
+          {
+            "displayID" : 1,
+            "isBuiltIn" : true,
+            "position" : [
+              -1728,
+              0
+            ],
+            "resolution" : [
+              1728,
+              1117
+            ]
+          }
+        ],
+        "externalMonitorCount" : 1
+      },
+      "floatingWindows" : [
+
+      ],
+      "id" : "PROFILE-UUID-1",
+      "name" : "Ultrawide Home",
+      "regions" : [
+        {
+          "assignedApps" : [
+            "chat.rocket"
+          ],
+          "displayID" : 3,
+          "frame" : [
+            [
+              0,
+              28
+            ],
+            [
+              1138,
+              720
+            ]
+          ],
+          "id" : "UW-LEFT-TOP",
+          "keyboardShortcut" : {
+            "key" : "z",
+            "modifiers" : [
+              "cmd",
+              "control",
+              "shift"
+            ]
+          },
+          "name" : "Left Top",
+          "padding" : 3
+        },
+        {
+          "assignedApps" : [
+            "com.apple.finder"
+          ],
+          "displayID" : 3,
+          "frame" : [
+            [
+              0,
+              751
+            ],
+            [
+              1138,
+              689
+            ]
+          ],
+          "id" : "UW-LEFT-BOTTOM",
+          "keyboardShortcut" : {
+            "key" : "x",
+            "modifiers" : [
+              "cmd",
+              "control",
+              "shift"
+            ]
+          },
+          "name" : "Left Bottom",
+          "padding" : 3
+        },
+        {
+          "assignedApps" : [
+            "com.microsoft.VSCode",
+            "org.mozilla.firefox",
+            "com.mitchellh.ghostty",
+            "md.obsidian"
+          ],
+          "displayID" : 3,
+          "frame" : [
+            [
+              1138,
+              0
+            ],
+            [
+              2276,
+              1440
+            ]
+          ],
+          "id" : "UW-CENTER",
+          "keyboardShortcut" : {
+            "key" : "c",
+            "modifiers" : [
+              "cmd",
+              "control",
+              "shift"
+            ]
+          },
+          "name" : "Center",
+          "padding" : 3
+        },
+        {
+          "assignedApps" : [
+            "com.example.webapp",
+            "com.microsoft.Word",
+            "com.microsoft.Excel",
+            "com.microsoft.Powerpoint"
+          ],
+          "displayID" : 3,
+          "frame" : [
+            [
+              3414,
+              0
+            ],
+            [
+              1706,
+              1440
+            ]
+          ],
+          "id" : "UW-RIGHT",
+          "keyboardShortcut" : {
+            "key" : "v",
+            "modifiers" : [
+              "cmd",
+              "control",
+              "shift"
+            ]
+          },
+          "name" : "Right",
+          "padding" : 3
+        },
+        {
+          "assignedApps" : [
+            "com.apple.mail",
+            "com.apple.iCal"
+          ],
+          "displayID" : 1,
+          "frame" : [
+            [
+              -1728,
+              0
+            ],
+            [
+              1728,
+              1117
+            ]
+          ],
+          "id" : "MACBOOK-FULLSCREEN",
+          "keyboardShortcut" : {
+            "key" : "b",
+            "modifiers" : [
+              "cmd",
+              "control",
+              "shift"
+            ]
+          },
+          "name" : "MacBook - Fullscreen",
+          "padding" : 0
+        }
+      ]
+    },
+    {
+      "displayTopology" : {
+        "displays" : [
+          {
+            "displayID" : 1,
+            "isBuiltIn" : true,
+            "position" : [
+              -1728,
+              483
+            ],
+            "resolution" : [
+              1728,
+              1117
+            ]
+          },
+          {
+            "displayID" : 3,
+            "isBuiltIn" : false,
+            "position" : [
+              0,
+              0
+            ],
+            "resolution" : [
+              3840,
+              1600
+            ]
+          }
+        ],
+        "externalMonitorCount" : 1
+      },
+      "floatingWindows" : [
+
+      ],
+      "id" : "PROFILE-UUID-2",
+      "name" : "Work Display",
+      "regions" : [
+        {
+          "assignedApps" : [
+            "chat.rocket"
+          ],
+          "displayID" : 3,
+          "frame" : [
+            [
+              0,
+              28
+            ],
+            [
+              1200,
+              800
+            ]
+          ],
+          "id" : "UW-LEFT-TOP",
+          "keyboardShortcut" : {
+            "key" : "Z",
+            "modifiers" : [
+              "control",
+              "shift",
+              "cmd"
+            ]
+          },
+          "name" : "Left Top",
+          "padding" : 3
+        },
+        {
+          "assignedApps" : [
+            "com.apple.finder"
+          ],
+          "displayID" : 3,
+          "frame" : [
+            [
+              0,
+              828
+            ],
+            [
+              1200,
+              770
+            ]
+          ],
+          "id" : "UW-LEFT-BOTTOM",
+          "keyboardShortcut" : {
+            "key" : "x",
+            "modifiers" : [
+              "cmd",
+              "control",
+              "shift"
+            ]
+          },
+          "name" : "Left Bottom",
+          "padding" : 3
+        },
+        {
+          "assignedApps" : [
+            "com.microsoft.VSCode",
+            "org.mozilla.firefox",
+            "com.mitchellh.ghostty",
+            "md.obsidian"
+          ],
+          "displayID" : 3,
+          "frame" : [
+            [
+              1200,
+              28
+            ],
+            [
+              2240,
+              1572
+            ]
+          ],
+          "id" : "UW-CENTER",
+          "keyboardShortcut" : {
+            "key" : "c",
+            "modifiers" : [
+              "cmd",
+              "control",
+              "shift"
+            ]
+          },
+          "name" : "Center",
+          "padding" : 3
+        },
+        {
+          "assignedApps" : [
+            "com.example.webapp",
+            "com.microsoft.Word",
+            "com.microsoft.Excel",
+            "com.microsoft.Powerpoint"
+          ],
+          "displayID" : 3,
+          "frame" : [
+            [
+              2000,
+              28
+            ],
+            [
+              1840,
+              1572
+            ]
+          ],
+          "id" : "UW-RIGHT",
+          "keyboardShortcut" : {
+            "key" : "v",
+            "modifiers" : [
+              "cmd",
+              "control",
+              "shift"
+            ]
+          },
+          "name" : "Right",
+          "padding" : 3
+        },
+        {
+          "assignedApps" : [
+            "com.apple.mail",
+            "com.apple.iCal"
+          ],
+          "displayID" : 1,
+          "frame" : [
+            [
+              -1728,
+              0
+            ],
+            [
+              1728,
+              1117
+            ]
+          ],
+          "id" : "MACBOOK-FULLSCREEN",
+          "keyboardShortcut" : {
+            "key" : "b",
+            "modifiers" : [
+              "cmd",
+              "control",
+              "shift"
+            ]
+          },
+          "name" : "MacBook - Fullscreen",
+          "padding" : 0
+        }
+      ]
+    },
+    {
+      "displayTopology" : {
+        "displays" : [
+          {
+            "displayID" : 1,
+            "isBuiltIn" : true,
+            "position" : [
+              0,
+              0
+            ],
+            "resolution" : [
+              1728,
+              1117
+            ]
+          }
+        ],
+        "externalMonitorCount" : 0
+      },
+      "floatingWindows" : [
+
+      ],
+      "id" : "PROFILE-UUID-3",
+      "name" : "Laptop Only",
+      "regions" : [
+        {
+          "assignedApps" : [
+            "chat.rocket"
+          ],
+          "displayID" : 1,
+          "frame" : [
+            [
+              0,
+              28
+            ],
+            [
+              1102,
+              672
+            ]
+          ],
+          "id" : "UW-LEFT-TOP",
+          "keyboardShortcut" : {
+            "key" : "Z",
+            "modifiers" : [
+              "control",
+              "shift",
+              "cmd"
+            ]
+          },
+          "name" : "Left Top",
+          "padding" : 3
+        },
+        {
+          "assignedApps" : [
+            "com.apple.finder"
+          ],
+          "displayID" : 1,
+          "frame" : [
+            [
+              0,
+              412
+            ],
+            [
+              1090,
+              673
+            ]
+          ],
+          "id" : "UW-LEFT-BOTTOM",
+          "keyboardShortcut" : {
+            "key" : "x",
+            "modifiers" : [
+              "cmd",
+              "control",
+              "shift"
+            ]
+          },
+          "name" : "Left Bottom",
+          "padding" : 3
+        },
+        {
+          "assignedApps" : [
+            "com.microsoft.VSCode",
+            "org.mozilla.firefox",
+            "com.mitchellh.ghostty",
+            "md.obsidian"
+          ],
+          "displayID" : 1,
+          "frame" : [
+            [
+              0,
+              28
+            ],
+            [
+              1734,
+              1084
+            ]
+          ],
+          "id" : "UW-CENTER",
+          "keyboardShortcut" : {
+            "key" : "c",
+            "modifiers" : [
+              "cmd",
+              "control",
+              "shift"
+            ]
+          },
+          "name" : "Center",
+          "padding" : 3
+        },
+        {
+          "assignedApps" : [
+            "com.example.webapp",
+            "com.microsoft.Word",
+            "com.microsoft.Excel",
+            "com.microsoft.Powerpoint"
+          ],
+          "displayID" : 1,
+          "frame" : [
+            [
+              0,
+              28
+            ],
+            [
+              1734,
+              1084
+            ]
+          ],
+          "id" : "UW-RIGHT",
+          "keyboardShortcut" : {
+            "key" : "v",
+            "modifiers" : [
+              "cmd",
+              "control",
+              "shift"
+            ]
+          },
+          "name" : "Right",
+          "padding" : 3
+        },
+        {
+          "assignedApps" : [
+            "com.apple.mail",
+            "com.apple.iCal"
+          ],
+          "displayID" : 1,
+          "frame" : [
+            [
+              0,
+              28
+            ],
+            [
+              1734,
+              1084
+            ]
+          ],
+          "id" : "MACBOOK-FULLSCREEN",
+          "keyboardShortcut" : {
+            "key" : "b",
+            "modifiers" : [
+              "cmd",
+              "control",
+              "shift"
+            ]
+          },
+          "name" : "MacBook - Fullscreen",
+          "padding" : 0
+        }
+      ]
+    }
+  ],
+  "version" : "1.0"
+}

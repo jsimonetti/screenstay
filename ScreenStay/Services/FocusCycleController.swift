@@ -200,7 +200,8 @@ actor FocusCycleController {
         let runningApps = NSWorkspace.shared.runningApplications
         
         if let app = runningApps.first(where: { $0.bundleIdentifier == bundleID }) {
-            // App is running, just activate
+            // App is running - send reopen event (like clicking Dock) then activate
+            sendReopenEvent(to: app)
             app.activate()
             log("✅ Activated app: \(bundleID)")
         } else if launchIfNeeded {
@@ -227,5 +228,22 @@ actor FocusCycleController {
                 log("❌ Could not find app: \(bundleID)")
             }
         }
+    }
+    
+    /// Send reopen AppleEvent to app (simulates clicking Dock icon)
+    @MainActor
+    private func sendReopenEvent(to app: NSRunningApplication) {
+        let pid = app.processIdentifier
+        let target = NSAppleEventDescriptor(processIdentifier: pid)
+        let event = NSAppleEventDescriptor(
+            eventClass: AEEventClass(kCoreEventClass),
+            eventID: AEEventID(kAEReopenApplication),
+            targetDescriptor: target,
+            returnID: AEReturnID(kAutoGenerateReturnID),
+            transactionID: AETransactionID(kAnyTransactionID)
+        )
+        
+        // Send the reopen event (no reply needed)
+        _ = try? event.sendEvent(options: .noReply, timeout: 1.0)
     }
 }

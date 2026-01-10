@@ -25,7 +25,7 @@ $(APP_BUNDLE): $(SOURCES)
 	@$(SWIFTC) -o $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME) $(SWIFT_FLAGS) $(SOURCES)
 
 sign: $(APP_BUNDLE)
-	@codesign --force --sign $(SIGNING_IDENTITY) --identifier $(BUNDLE_ID) --entitlements $(ENTITLEMENTS) --options runtime $(APP_BUNDLE)
+	@codesign --force --sign "$(SIGNING_IDENTITY)" --identifier $(BUNDLE_ID) --entitlements $(ENTITLEMENTS) --options runtime $(APP_BUNDLE)
 
 info-plist:
 	@printf '<?xml version="1.0" encoding="UTF-8"?>\n' > $(APP_BUNDLE)/Contents/Info.plist

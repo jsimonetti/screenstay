@@ -79,14 +79,36 @@ make install    # Build and copy to /Applications
 
 macOS requires applications to be signed to run without security warnings. The Makefile includes a signing target.
 
-To sign the application with your own certificate:
+### Creating a Self-Signed Certificate
+
+If you don't have a Developer ID certificate, create a self-signed certificate for local development using Keychain Access:
 
 ```bash
-# Find your signing identity
-security find-identity -v -p codesigning
+# Open Keychain Access
+open "/System/Applications/Utilities/Keychain Access.app"
+```
 
+Then follow these steps:
+
+1. Keychain Access > Certificate Assistant > Create a Certificate
+2. Name: `ScreenStay Code Signing`
+3. Identity Type: Self-Signed Root
+4. Certificate Type: Code Signing
+5. Check "Let me override defaults"
+6. Continue through dialogs, accepting defaults but extending validity to 3650 days
+7. Set Keychain to "login"
+
+Verify the certificate was created:
+
+```bash
+security find-identity -v -p codesigning
+```
+
+To sign the application with your certificate:
+
+```bash
 # Sign using the Makefile
-make sign SIGNING_IDENTITY="YOUR_IDENTITY"
+make sign SIGNING_IDENTITY="ScreenStay Code Signing"
 ```
 
 ### Custom Build Configuration

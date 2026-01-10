@@ -1,0 +1,29 @@
+# Build outputs
+build/
+*.app
+*.dSYM
+
+# Personal configuration
+Makefile.local
+
+# Xcode
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/
+
+# User configs (keep sample)
+current-config.json

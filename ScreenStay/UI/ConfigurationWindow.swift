@@ -32,12 +32,14 @@ class ConfigurationWindow: NSWindowController {
     private let addRegionButton = NSButton()
     private let editRegionButton = NSButton()
     private let deleteRegionButton = NSButton()
+    private let designateFocusRegionButton = NSButton()
     
     // Global Settings Tab
     private let autoSwitchCheckbox = NSButton()
     private let autoRepositionCheckbox = NSButton()
     private let requireConfirmCheckbox = NSButton()
     private var resetWindowShortcutRecorder: KeyboardShortcutRecorder?
+    private var focusWindowShortcutRecorder: KeyboardShortcutRecorder?
     
     init(profileManager: ProfileManager, eventCoordinator: EventCoordinator) {
         self.profileManager = profileManager
@@ -185,8 +187,6 @@ class ConfigurationWindow: NSWindowController {
     }
     
     @objc private func addProfile() {
-        log("➕ Add profile clicked")
-        
         // Ask for profile name
         let alert = NSAlert()
         alert.messageText = "Create New Profile"
@@ -222,8 +222,6 @@ class ConfigurationWindow: NSWindowController {
             if let index = config?.profiles.firstIndex(where: { $0.id == newProfile.id }) {
                 profilesTableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
             }
-            
-            log("✅ Created profile: \(name) with \(topology.displays.count) display(s)")
         }
     }
     
@@ -233,8 +231,6 @@ class ConfigurationWindow: NSWindowController {
             showAlert(message: "Please select a profile to delete")
             return
         }
-        
-        log("🗑️ Delete profile: \(profile.name)")
         
         // Confirm deletion
         let alert = NSAlert()
@@ -257,15 +253,12 @@ class ConfigurationWindow: NSWindowController {
             } else {
                 selectedProfileID = nil
             }
-            
-            log("✅ Deleted profile: \(profile.name)")
         }
     }
     
     @objc private func captureDisplays() {
         let topology = DisplayCapture.captureCurrentTopology()
         let description = DisplayCapture.describeTopology(topology)
-        log("📸 Captured: \(description)")
         
         let alert = NSAlert()
         alert.messageText = "Display Topology Captured"
@@ -282,7 +275,6 @@ class ConfigurationWindow: NSWindowController {
                 profile.displayTopology = topology
                 config?.profiles[selectedRow] = profile
                 profilesTableView.reloadData()
-                log("✅ Updated profile topology: \(profile.name)")
             }
         }
     }
@@ -294,15 +286,11 @@ class ConfigurationWindow: NSWindowController {
             return
         }
         
-        log("✅ Activate profile: \(profile.name)")
-        
         Task {
             await profileManager.setActiveProfile(profile)
             
             // Refresh the menu to update profile checkmarks
             await MainActor.run {
-                log("✅ Profile activated: \(profile.name)")
-                
                 let alert = NSAlert()
                 alert.messageText = "Profile Activated"
                 alert.informativeText = "The profile '\(profile.name)' is now active."
@@ -324,7 +312,6 @@ class ConfigurationWindow: NSWindowController {
         }
         
         config?.profiles[row].name = newName
-        log("✏️ Profile name changed to: \(newName)")
     }
     
     // MARK: - Regions Tab
@@ -406,9 +393,15 @@ class ConfigurationWindow: NSWindowController {
         toggleOverlayButton.target = self
         toggleOverlayButton.action = #selector(toggleOverlay)
         
+        designateFocusRegionButton.title = "Designate as Focus Region"
+        designateFocusRegionButton.bezelStyle = .rounded
+        designateFocusRegionButton.target = self
+        designateFocusRegionButton.action = #selector(designateFocusRegion)
+        
         buttonStack.addArrangedSubview(addRegionButton)
         buttonStack.addArrangedSubview(editRegionButton)
         buttonStack.addArrangedSubview(deleteRegionButton)
+        buttonStack.addArrangedSubview(designateFocusRegionButton)
         buttonStack.addArrangedSubview(toggleOverlayButton)
         
         containerView.addSubview(buttonStack)
@@ -452,8 +445,6 @@ class ConfigurationWindow: NSWindowController {
             
             // Clear the reference when done
             self.regionEditorDialog = nil
-            
-            log("✅ Added region: \(newRegion.name)")
         }
         
         // Retain the editor so it doesn't get deallocated
@@ -492,8 +483,6 @@ class ConfigurationWindow: NSWindowController {
             
             // Clear the reference when done
             self.regionEditorDialog = nil
-            
-            log("✅ Updated region: \(updatedRegion.name)")
         }
         
         // Retain the editor so it doesn't get deallocated
@@ -529,9 +518,33 @@ class ConfigurationWindow: NSWindowController {
             if overlayManager.isShowing() {
                 overlayManager.showOverlays(for: self.config!.profiles[profileIndex].regions)
             }
-            
-            log("🗑️ Deleted region: \(region.name)")
         }
+    }
+    
+    @objc private func designateFocusRegion() {
+        guard let config = config, let profileID = selectedProfileID else { return }
+        guard let profileIndex = config.profiles.firstIndex(where: { $0.id == profileID }) else { return }
+        
+        let selectedRow = regionsTableView.selectedRow
+        guard selectedRow >= 0 && selectedRow < config.profiles[profileIndex].regions.count else {
+            showAlert(message: "Please select a region to designate as focus region")
+            return
+        }
+        
+        // Clear any existing focus region in this profile
+        for i in 0..<config.profiles[profileIndex].regions.count {
+            self.config?.profiles[profileIndex].regions[i].isFocusRegion = false
+        }
+        
+        // Set the selected region as focus region
+        self.config?.profiles[profileIndex].regions[selectedRow].isFocusRegion = true
+        
+        let regionName = config.profiles[profileIndex].regions[selectedRow].name
+        
+        // Reload table to show updated state
+        regionsTableView.reloadData()
+        
+        showAlert(message: "Region '\(regionName)' is now the focus region for this profile")
     }
     
     @objc private func toggleOverlay() {
@@ -561,8 +574,6 @@ class ConfigurationWindow: NSWindowController {
         
         self.config = config
         regionsTableView.reloadData()
-        
-        log("✏️ Updated \(updatedRegions.count) regions from overlay")
     }
     
     @objc private func profileSelectorChanged() {
@@ -582,8 +593,6 @@ class ConfigurationWindow: NSWindowController {
         if overlayManager.isShowing() {
             overlayManager.showOverlays(for: profile.regions)
         }
-        
-        log("📋 Switched to profile: \(profile.name)")
     }
     
     // MARK: - Global Settings Tab
@@ -648,6 +657,30 @@ class ConfigurationWindow: NSWindowController {
             recorder.heightAnchor.constraint(equalToConstant: 30)
         ])
         
+        // Focus window keyboard shortcut
+        let focusShortcutLabel = NSTextField(labelWithString: "Focus Window to Region Shortcut:")
+        focusShortcutLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        stackView.addArrangedSubview(focusShortcutLabel)
+        
+        let focusRecorder = KeyboardShortcutRecorder()
+        focusRecorder.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Set initial shortcut from config
+        if let shortcut = config?.globalSettings.focusWindowShortcut {
+            focusRecorder.setShortcut(modifiers: shortcut.modifiers, key: shortcut.key)
+        }
+        
+        focusRecorder.onShortcutChanged = { [weak self] shortcutTuple in
+            self?.focusWindowShortcutChanged(shortcutTuple)
+        }
+        self.focusWindowShortcutRecorder = focusRecorder
+        stackView.addArrangedSubview(focusRecorder)
+        
+        NSLayoutConstraint.activate([
+            focusRecorder.widthAnchor.constraint(equalToConstant: 300),
+            focusRecorder.heightAnchor.constraint(equalToConstant: 30)
+        ])
+        
         containerView.addSubview(stackView)
         
         NSLayoutConstraint.activate([
@@ -661,18 +694,24 @@ class ConfigurationWindow: NSWindowController {
     }
     
     @objc private func settingsChanged() {
-        log("⚙️ Settings changed")
-        // TODO: Save to config
+        // Settings are already updated via checkbox bindings and saved when Save is clicked
     }
     
     private func resetWindowShortcutChanged(_ shortcutTuple: (modifiers: [String], key: String)?) {
         // Convert tuple to KeyboardShortcut
         if let tuple = shortcutTuple {
             config?.globalSettings.resetWindowShortcut = KeyboardShortcut(modifiers: tuple.modifiers, key: tuple.key)
-            log("⌨️ Reset window shortcut changed to: \(tuple.modifiers.joined(separator: "+"))+\(tuple.key)")
         } else {
             config?.globalSettings.resetWindowShortcut = nil
-            log("⌨️ Reset window shortcut cleared")
+        }
+    }
+    
+    private func focusWindowShortcutChanged(_ shortcutTuple: (modifiers: [String], key: String)?) {
+        // Convert tuple to KeyboardShortcut
+        if let tuple = shortcutTuple {
+            config?.globalSettings.focusWindowShortcut = KeyboardShortcut(modifiers: tuple.modifiers, key: tuple.key)
+        } else {
+            config?.globalSettings.focusWindowShortcut = nil
         }
     }
     
@@ -691,9 +730,12 @@ class ConfigurationWindow: NSWindowController {
                 autoRepositionCheckbox.state = config.globalSettings.repositionOnAppLaunch ? .on : .off
                 requireConfirmCheckbox.state = config.globalSettings.requireConfirmToLaunchApps ? .on : .off
                 
-                // Update shortcut recorder with loaded config
+                // Update shortcut recorders with loaded config
                 if let shortcut = config.globalSettings.resetWindowShortcut {
                     resetWindowShortcutRecorder?.setShortcut(modifiers: shortcut.modifiers, key: shortcut.key)
+                }
+                if let shortcut = config.globalSettings.focusWindowShortcut {
+                    focusWindowShortcutRecorder?.setShortcut(modifiers: shortcut.modifiers, key: shortcut.key)
                 }
             }
             
@@ -737,8 +779,6 @@ class ConfigurationWindow: NSWindowController {
     @objc private func saveConfiguration() {
         guard var config = config else { return }
         
-        log("💾 Saving configuration...")
-        
         // Update global settings from UI
         config.globalSettings.enableAutoProfileSwitch = autoSwitchCheckbox.state == .on
         config.globalSettings.repositionOnAppLaunch = autoRepositionCheckbox.state == .on
@@ -749,6 +789,12 @@ class ConfigurationWindow: NSWindowController {
             config.globalSettings.resetWindowShortcut = KeyboardShortcut(modifiers: shortcutTuple.modifiers, key: shortcutTuple.key)
         } else {
             config.globalSettings.resetWindowShortcut = nil
+        }
+        
+        if let shortcutTuple = focusWindowShortcutRecorder?.currentShortcut {
+            config.globalSettings.focusWindowShortcut = KeyboardShortcut(modifiers: shortcutTuple.modifiers, key: shortcutTuple.key)
+        } else {
+            config.globalSettings.focusWindowShortcut = nil
         }
         
         Task {
@@ -766,15 +812,11 @@ class ConfigurationWindow: NSWindowController {
                 await self.eventCoordinator?.updateKeyboardShortcuts()
                 
                 await MainActor.run {
-                    log("✅ Configuration saved and reloaded successfully")
-                    
                     // Close the settings window
                     self.close()
                 }
             } catch {
                 await MainActor.run {
-                    log("❌ Failed to save configuration: \(error)")
-                    
                     let alert = NSAlert()
                     alert.messageText = "Save Failed"
                     alert.informativeText = "Failed to save configuration: \(error.localizedDescription)"
@@ -834,7 +876,11 @@ extension ConfigurationWindow: NSTableViewDelegate, NSTableViewDataSource {
             textField.backgroundColor = .clear
             
             if identifier.rawValue == "regionName" {
-                textField.stringValue = region.name
+                var name = region.name
+                if region.isFocusRegion {
+                    name += " 🎯"
+                }
+                textField.stringValue = name
             } else if identifier.rawValue == "frame" {
                 textField.stringValue = "[\(Int(region.frame.origin.x)), \(Int(region.frame.origin.y))] [\(Int(region.frame.width)), \(Int(region.frame.height))]"
             } else if identifier.rawValue == "shortcut" {

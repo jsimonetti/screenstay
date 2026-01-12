@@ -262,8 +262,6 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
         let wVal = "\(Int(frame.width))"
         let hVal = "\(Int(frame.height))"
         
-        log("📋 Populating fields: x=\(xVal), y=\(yVal), w=\(wVal), h=\(hVal)")
-        
         xField.stringValue = xVal
         yField.stringValue = yVal
         widthField.stringValue = wVal
@@ -276,9 +274,6 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
     }
     
     @objc private func drawRegion() {
-        log("📐 Draw Region button clicked!")
-        log("📐 Starting region drawing mode")
-        
         // Hide this dialog temporarily
         window?.orderOut(nil)
         
@@ -296,20 +291,15 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.window?.makeKeyAndOrderFront(nil)
             }
-            
-            log("📐 Region drawn: [\(Int(drawnRect.origin.x)), \(Int(drawnRect.origin.y))] [\(Int(drawnRect.width)), \(Int(drawnRect.height))]")
         }
         
         // Ensure overlay is shown and can receive events
         overlay.orderFrontRegardless()
         overlay.makeKey()
         NSApp.activate(ignoringOtherApps: true)
-        
-        log("📐 Drawing overlay shown and activated")
     }
     
     @objc private func addApp() {
-        log("➕ Add App button clicked!")
         // Show menu with running apps
         let menu = NSMenu()
         
@@ -369,10 +359,8 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
     }
     
     @objc private func removeApp() {
-        log("➖ Remove App button clicked!")
         let selectedRow = appsTableView.selectedRow
         guard selectedRow >= 0 && selectedRow < appBundleIDs.count else {
-            log("➖ No row selected (selectedRow: \(selectedRow))")
             return
         }
         
@@ -406,7 +394,6 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
     }
     
     @objc private func save() {
-        log("💾 Save button clicked!")
         // Validate and create region
         guard !nameField.stringValue.isEmpty else {
             showAlert(message: "Please enter a region name")
@@ -457,7 +444,6 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
     }
     
     @objc private func cancel() {
-        log("❌ Cancel button clicked!")
         closeSheet()
     }
     

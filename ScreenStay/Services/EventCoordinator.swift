@@ -10,6 +10,7 @@ class EventCoordinator: ObservableObject {
     private let accessibilityService: AccessibilityService
     private let keyboardHandler = GlobalKeyboardHandler()
     private let windowEventMonitor: WindowEventMonitor
+    private let focusRegionManager: FocusRegionManager
     
     init(
         profileManager: ProfileManager,
@@ -23,6 +24,9 @@ class EventCoordinator: ObservableObject {
         
         // Create window event monitor with access to accessibility service
         self.windowEventMonitor = WindowEventMonitor(accessibilityService: accessibilityService)
+        
+        // Create focus region manager
+        self.focusRegionManager = FocusRegionManager(accessibilityService: accessibilityService)
         
         // Initialize enforcer with monitor reference
         self.windowPositionEnforcer = windowPositionEnforcer
@@ -194,6 +198,9 @@ class EventCoordinator: ObservableObject {
     }
     
     private func handleDisplayChange() async {
+        // Clear any focused window since display topology changed
+        focusRegionManager.clearFocus()
+        
         // Reset window tracking since display topology changed
         windowEventMonitor.resetPositionedWindows()
         
@@ -248,24 +255,14 @@ class EventCoordinator: ObservableObject {
         let regions = await profileManager.activeRegions
         let config = await profileManager.getConfiguration()
         
-        log("🎹 EventCoordinator: Found \(regions.count) active regions")
-        
-        for region in regions {
-            if let shortcut = region.keyboardShortcut {
-                log("   - \(region.name): \(shortcut.modifiers.joined(separator: "+"))+\(shortcut.key)")
-            } else {
-                log("   - \(region.name): NO SHORTCUT")
-            }
-        }
-        
-        // Collect all shortcuts (region shortcuts + reset window shortcut)
+        // Collect all shortcuts (region shortcuts + reset window shortcut + focus window shortcut)
         var shortcuts = regions.compactMap { $0.keyboardShortcut }
         if let resetShortcut = config.globalSettings.resetWindowShortcut {
             shortcuts.append(resetShortcut)
-            log("   - Reset Window: \(resetShortcut.modifiers.joined(separator: "+"))+\(resetShortcut.key)")
         }
-        
-        log("🎹 Starting keyboard handler with \(shortcuts.count) shortcuts")
+        if let focusShortcut = config.globalSettings.focusWindowShortcut {
+            shortcuts.append(focusShortcut)
+        }
         
         keyboardHandler.start(shortcuts: shortcuts) { [weak self] shortcut in
             guard let self = self else { return }
@@ -276,8 +273,14 @@ class EventCoordinator: ObservableObject {
                 // Check if this is the reset window shortcut
                 if let resetShortcut = config.globalSettings.resetWindowShortcut,
                    shortcut.key == resetShortcut.key && shortcut.modifiers == resetShortcut.modifiers {
-                    log("⌨️ Reset window shortcut triggered")
                     await self.handleResetWindowShortcut()
+                    return
+                }
+                
+                // Check if this is the focus window shortcut
+                if let focusShortcut = config.globalSettings.focusWindowShortcut,
+                   shortcut.key == focusShortcut.key && shortcut.modifiers == focusShortcut.modifiers {
+                    await self.handleFocusWindowShortcut()
                     return
                 }
                 
@@ -285,7 +288,6 @@ class EventCoordinator: ObservableObject {
                 let regions = await self.profileManager.activeRegions
                 if let region = regions.first(where: { $0.keyboardShortcut?.key == shortcut.key && 
                                                             $0.keyboardShortcut?.modifiers == shortcut.modifiers }) {
-                    log("⌨️ Triggering region: \(region.name)")
                     await self.focusCycleController.cycleFocus(for: region)
                 }
             }
@@ -304,36 +306,64 @@ class EventCoordinator: ObservableObject {
         // Get the currently focused window
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication,
               let bundleID = frontmostApp.bundleIdentifier else {
-            log("⚠️ No frontmost app found")
             return
         }
         
-        log("🎯 Resetting window for app: \(bundleID)")
-        
         // Get the focused window using accessibility API
         guard let focusedWindow = accessibilityService.getFrontmostWindow(for: frontmostApp) else {
-            log("⚠️ No focused window found for \(bundleID)")
             return
         }
         
         // Find which region this app belongs to
         let regions = await profileManager.activeRegions
         guard let region = regions.first(where: { $0.assignedApps.contains(bundleID) }) else {
-            log("⚠️ App \(bundleID) is not assigned to any region")
             return
         }
         
         // Don't reposition dialogs/sheets even with explicit shortcut
         guard accessibilityService.shouldPositionWindow(focusedWindow) else {
-            log("⚠️ Cannot reposition dialog/sheet/floating window")
             return
         }
         
-        log("✅ Repositioning window to region '\(region.name)'")
-        
         // Reposition the window
         await windowPositionEnforcer.enforceRegion(region, for: frontmostApp, window: focusedWindow)
+    }
+    
+    // MARK: - Focus Window Handler
+    
+    private func handleFocusWindowShortcut() async {
+        // Get the currently frontmost window
+        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
+            return
+        }
         
-        log("✅ Window repositioned")
+        guard let frontmostWindow = accessibilityService.getFrontmostWindow(for: frontmostApp) else {
+            return
+        }
+        
+        // Don't focus dialogs/sheets
+        guard accessibilityService.shouldPositionWindow(frontmostWindow) else {
+            return
+        }
+        
+        // Get window ID for tracking
+        guard let windowID = accessibilityService.getWindowID(frontmostWindow) else {
+            return
+        }
+        
+        // Find the focus region in active profile
+        let regions = await profileManager.activeRegions
+        guard let focusRegion = regions.first(where: { $0.isFocusRegion }) else {
+            return
+        }
+        
+        // If this window is already focused, unfocus it (toggle)
+        if focusRegionManager.isWindowFocused(windowID) {
+            focusRegionManager.unfocusWindow()
+            return
+        }
+        
+        // Focus the window (this will unfocus any previously focused window)
+        focusRegionManager.focusWindow(frontmostWindow, windowID: windowID, toRegion: focusRegion)
     }
 }

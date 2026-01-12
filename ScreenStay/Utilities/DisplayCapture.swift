@@ -16,7 +16,6 @@ class DisplayCapture {
         let result = CGGetActiveDisplayList(maxDisplays, &displayIDs, &displayCount)
         
         guard result == .success else {
-            log("❌ Failed to get display list")
             return DisplayTopology(displays: [], externalMonitorCount: 0)
         }
         
@@ -39,8 +38,6 @@ class DisplayCapture {
             )
             
             displays.append(display)
-            
-            log("📺 Display \(displayID): \(Int(bounds.width))x\(Int(bounds.height)) at (\(Int(bounds.origin.x)), \(Int(bounds.origin.y))) \(isBuiltIn ? "[Built-in]" : "[External]")")
         }
         
         // Sort by displayID for consistency

@@ -34,6 +34,15 @@ Define rectangular regions on any display where applications should be positione
 
 Assign keyboard shortcuts to regions to cycle focus between windows in that region. Shortcuts support modifier keys (Command, Option, Control, Shift) combined with any standard key.
 
+Global keyboard shortcuts can also be configured for:
+
+- **Reset Window to Region**: Returns the currently focused window to its assigned region
+- **Focus Window to Region**: Temporarily moves any window to a designated focus region
+
+### Focus Region
+
+Designate one region per profile as a focus region. This allows you to temporarily move any window to that region using a keyboard shortcut, regardless of its assigned region. The window retains memory of its original position and can be returned by pressing the focus shortcut again. If you focus a different window, the previous window automatically returns to its original position. Focus is cleared if you manually move the focused window or if the profile changes.
+
 ### Configuration Interface
 
 The Settings window provides a graphical interface for:
@@ -182,8 +191,9 @@ Logs can be accessed through the menu bar (Logs option) or cleared when needed (
 2. Define regions on your displays where windows should be positioned
 3. Assign applications to each region by bundle identifier
 4. Optionally assign keyboard shortcuts to regions for quick focus cycling
-5. ScreenStay automatically repositions windows when applications launch
-6. When displays change, ScreenStay switches to the matching profile
+5. Optionally designate one region as a focus region for temporary window positioning
+6. ScreenStay automatically repositions windows when applications launch
+7. When displays change, ScreenStay switches to the matching profile
 
 ## Region Overlay
 

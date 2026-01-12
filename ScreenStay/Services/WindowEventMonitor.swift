@@ -30,15 +30,12 @@ class WindowEventMonitor {
                 createObserver(for: app)
             }
         }
-        
-        log("🔍 WindowEventMonitor: Monitoring \(bundleIDs.count) apps")
     }
     
     /// Stop monitoring all windows
     func stopMonitoring() {
-        for (pid, observer) in observers {
+        for (_, observer) in observers {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
-            log("   Stopped monitoring PID \(pid)")
         }
         observers.removeAll()
         monitoredBundleIDs.removeAll()
@@ -61,7 +58,6 @@ class WindowEventMonitor {
     func removeObserver(for app: NSRunningApplication) async {
         if let observer = observers.removeValue(forKey: app.processIdentifier) {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
-            log("   Removed observer for \(app.bundleIdentifier ?? "unknown")")
         }
         
         // Clean up window IDs for this app
@@ -94,7 +90,6 @@ class WindowEventMonitor {
     func removeWindowFromPositioned(_ window: AXUIElement) {
         if let windowID = accessibilityService.getWindowID(window) {
             positionedWindows.remove(windowID)
-            log("   Removed window \(windowID) from positioned set")
         }
     }
     
@@ -109,7 +104,6 @@ class WindowEventMonitor {
     /// Reset all positioned window tracking (e.g., when profile changes)
     func resetPositionedWindows() {
         positionedWindows.removeAll()
-        log("   Reset positioned windows tracking")
     }
     
     // MARK: - Private Implementation
@@ -155,7 +149,6 @@ class WindowEventMonitor {
         guard result == .success, let observer = observer else {
             contextPtr.deinitialize(count: 1)
             contextPtr.deallocate()
-            log("⚠️ Failed to create observer for PID \(pid)")
             return
         }
         
@@ -167,7 +160,6 @@ class WindowEventMonitor {
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
         
         observers[pid] = observer
-        log("   Created observer for \(app.bundleIdentifier ?? "unknown") (PID \(pid))")
     }
     
     private func handleWindowEvent(notification: String, element: AXUIElement, pid: pid_t) {

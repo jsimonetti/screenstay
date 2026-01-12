@@ -114,7 +114,6 @@ class RegionDrawingOverlay: NSWindow {
     }
     
     private func cancel() {
-        log("📐 Region drawing cancelled")
         close()
     }
 }

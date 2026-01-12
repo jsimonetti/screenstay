@@ -50,7 +50,6 @@ class PermissionManager {
         )
         
         guard let tap = testTap else {
-            log("❌ Input Monitoring check: Cannot create event tap")
             return false
         }
         
@@ -58,7 +57,6 @@ class PermissionManager {
         
         // If we can create the tap, assume permission is granted
         // The system will enforce the actual permission when events are captured
-        log("✅ Input Monitoring check: Event tap created (permission likely granted)")
         return true
     }
     
@@ -89,8 +87,6 @@ class PermissionManager {
         let hasAccessibility = checkAccessibility()
         
         if !hasAccessibility {
-            log("⚠️ Missing Accessibility permission")
-            
             // Request Accessibility with system prompt
             requestAccessibility()
             
@@ -102,7 +98,6 @@ class PermissionManager {
         
         // Accessibility is granted, but we need to remind about Input Monitoring
         // since it cannot be reliably checked programmatically
-        log("✅ Accessibility permission granted")
         
         // Show a one-time reminder about Input Monitoring on first launch
         let hasShownReminder = UserDefaults.standard.bool(forKey: "HasShownInputMonitoringReminder")

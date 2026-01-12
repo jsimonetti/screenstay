@@ -39,19 +39,22 @@ class RegionOverlayWindow: NSWindow {
         
         contentView.wantsLayer = true
         
+        // Choose color based on whether this is a focus region
+        let overlayColor = region.isFocusRegion ? NSColor.systemOrange : NSColor.systemBlue
+        
         // Border
         contentView.layer?.borderWidth = 3
-        contentView.layer?.borderColor = NSColor.systemBlue.withAlphaComponent(0.8).cgColor
+        contentView.layer?.borderColor = overlayColor.withAlphaComponent(0.8).cgColor
         contentView.layer?.cornerRadius = 8
         
         // Semi-transparent background
-        contentView.layer?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.1).cgColor
+        contentView.layer?.backgroundColor = overlayColor.withAlphaComponent(0.1).cgColor
         
         // Label with region name and shortcut
         labelView.isEditable = false
         labelView.isBordered = false
         labelView.drawsBackground = true
-        labelView.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.9)
+        labelView.backgroundColor = overlayColor.withAlphaComponent(0.9)
         labelView.textColor = .white
         labelView.font = .systemFont(ofSize: 16, weight: .semibold)
         labelView.alignment = .center
@@ -64,7 +67,8 @@ class RegionOverlayWindow: NSWindow {
             shortcutText = ""
         }
         
-        labelView.stringValue = region.name + shortcutText
+        let focusIndicator = region.isFocusRegion ? " 🎯" : ""
+        labelView.stringValue = region.name + focusIndicator + shortcutText
         
         labelView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(labelView)
@@ -241,8 +245,6 @@ class RegionOverlayManager {
             overlay.orderFrontRegardless()
             overlayWindows.append(overlay)
         }
-        
-        log("👁️ Showing overlays for \(regions.count) regions")
     }
     
     func hideOverlays(saveChanges: Bool = false) {
@@ -255,7 +257,6 @@ class RegionOverlayManager {
                 updatedRegions.append(region)
             }
             onRegionsUpdated?(updatedRegions)
-            log("💾 Saved \(updatedRegions.count) region updates")
         }
         
         backgroundOverlay?.orderOut(nil)

@@ -10,9 +10,10 @@ struct Region: Codable, Identifiable, Sendable {
     var assignedApps: [String] // Bundle identifiers like "com.apple.Terminal"
     var keyboardShortcut: KeyboardShortcut?
     var padding: CGFloat = 0  // Padding in pixels to apply to all edges
+    var isFocusRegion: Bool = false  // Whether this is the focus region for the profile
     
     enum CodingKeys: String, CodingKey {
-        case id, name, displayID, frame, assignedApps, keyboardShortcut, padding
+        case id, name, displayID, frame, assignedApps, keyboardShortcut, padding, isFocusRegion
     }
     
     init(from decoder: Decoder) throws {
@@ -24,6 +25,7 @@ struct Region: Codable, Identifiable, Sendable {
         assignedApps = try container.decode([String].self, forKey: .assignedApps)
         keyboardShortcut = try container.decodeIfPresent(KeyboardShortcut.self, forKey: .keyboardShortcut)
         padding = try container.decodeIfPresent(CGFloat.self, forKey: .padding) ?? 0
+        isFocusRegion = try container.decodeIfPresent(Bool.self, forKey: .isFocusRegion) ?? false
     }
     
     init(
@@ -33,7 +35,8 @@ struct Region: Codable, Identifiable, Sendable {
         frame: CGRect,
         assignedApps: [String] = [],
         keyboardShortcut: KeyboardShortcut? = nil,
-        padding: CGFloat = 0
+        padding: CGFloat = 0,
+        isFocusRegion: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -42,6 +45,7 @@ struct Region: Codable, Identifiable, Sendable {
         self.assignedApps = assignedApps
         self.keyboardShortcut = keyboardShortcut
         self.padding = padding
+        self.isFocusRegion = isFocusRegion
     }
 }
 

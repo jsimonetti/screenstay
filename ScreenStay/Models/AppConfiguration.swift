@@ -12,9 +12,10 @@ struct AppConfiguration: Codable, Sendable {
         var repositionOnDisplayChange: Bool
         var requireConfirmToLaunchApps: Bool
         var resetWindowShortcut: KeyboardShortcut?
+        var focusWindowShortcut: KeyboardShortcut?
         
         enum CodingKeys: String, CodingKey {
-            case enableAutoProfileSwitch, repositionOnAppLaunch, repositionOnDisplayChange, requireConfirmToLaunchApps, resetWindowShortcut
+            case enableAutoProfileSwitch, repositionOnAppLaunch, repositionOnDisplayChange, requireConfirmToLaunchApps, resetWindowShortcut, focusWindowShortcut
         }
         
         init(from decoder: Decoder) throws {
@@ -24,6 +25,7 @@ struct AppConfiguration: Codable, Sendable {
             repositionOnDisplayChange = try container.decode(Bool.self, forKey: .repositionOnDisplayChange)
             requireConfirmToLaunchApps = try container.decodeIfPresent(Bool.self, forKey: .requireConfirmToLaunchApps) ?? false
             resetWindowShortcut = try container.decodeIfPresent(KeyboardShortcut.self, forKey: .resetWindowShortcut)
+            focusWindowShortcut = try container.decodeIfPresent(KeyboardShortcut.self, forKey: .focusWindowShortcut)
         }
         
         init(
@@ -31,13 +33,15 @@ struct AppConfiguration: Codable, Sendable {
             repositionOnAppLaunch: Bool,
             repositionOnDisplayChange: Bool,
             requireConfirmToLaunchApps: Bool,
-            resetWindowShortcut: KeyboardShortcut? = nil
+            resetWindowShortcut: KeyboardShortcut? = nil,
+            focusWindowShortcut: KeyboardShortcut? = nil
         ) {
             self.enableAutoProfileSwitch = enableAutoProfileSwitch
             self.repositionOnAppLaunch = repositionOnAppLaunch
             self.repositionOnDisplayChange = repositionOnDisplayChange
             self.requireConfirmToLaunchApps = requireConfirmToLaunchApps
             self.resetWindowShortcut = resetWindowShortcut
+            self.focusWindowShortcut = focusWindowShortcut
         }
         
         static let `default` = GlobalSettings(
@@ -45,7 +49,8 @@ struct AppConfiguration: Codable, Sendable {
             repositionOnAppLaunch: true,
             repositionOnDisplayChange: true,
             requireConfirmToLaunchApps: false,
-            resetWindowShortcut: KeyboardShortcut(modifiers: ["cmd", "option"], key: "r")
+            resetWindowShortcut: KeyboardShortcut(modifiers: ["cmd", "option"], key: "r"),
+            focusWindowShortcut: KeyboardShortcut(modifiers: ["cmd", "option"], key: "f")
         )
     }
     

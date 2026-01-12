@@ -36,7 +36,6 @@ actor FocusCycleController {
     func cycleFocus(for region: Region) async {
         let assignedApps = region.assignedApps
         guard !assignedApps.isEmpty else {
-            log("⚠️ Region '\(region.name)' has no assigned apps")
             return
         }
         
@@ -49,7 +48,6 @@ actor FocusCycleController {
         // Build app list for this region
         let apps = await buildAppList(for: region)
         guard !apps.isEmpty else {
-            log("⚠️ No apps available for region '\(region.name)'")
             return
         }
         
@@ -84,8 +82,6 @@ actor FocusCycleController {
         
         // Start monitoring for modifier release
         await startModifierMonitoring()
-        
-        log("🔄 App switcher activated for region: \(region.name)")
     }
     
     /// Build ordered list of apps for region (running apps by MRU, then unstarted)
@@ -142,8 +138,6 @@ actor FocusCycleController {
         switcherState = state
         
         switcherWindow?.updateApps(state.apps, selectedIndex: state.selectedIndex)
-        
-        log("🔄 Advanced to app: \(state.apps[state.selectedIndex].name)")
     }
     
     /// Start monitoring for modifier key release
@@ -178,7 +172,6 @@ actor FocusCycleController {
         guard let state = switcherState else { return }
         
         let selectedApp = state.apps[state.selectedIndex]
-        log("✅ Committing selection: \(selectedApp.name)")
         
         // Hide switcher
         switcherWindow?.hide()
@@ -203,29 +196,19 @@ actor FocusCycleController {
             // App is running - send reopen event (like clicking Dock) then activate
             sendReopenEvent(to: app)
             app.activate()
-            log("✅ Activated app: \(bundleID)")
         } else if launchIfNeeded {
             // Check global setting
             let config = await profileManager.getConfiguration()
             let requireConfirm = config.globalSettings.requireConfirmToLaunchApps
             
             if requireConfirm {
-                log("ℹ️ App \(bundleID) not running (launch requires confirmation)")
-                // TODO: Show confirmation dialog in future enhancement
+                // Require manual launch when this setting is enabled
                 return
             }
             
             // Launch the app
             if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-                NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { app, error in
-                    if let error = error {
-                        log("❌ Failed to launch \(bundleID): \(error)")
-                    } else {
-                        log("🚀 Launched app: \(bundleID)")
-                    }
-                }
-            } else {
-                log("❌ Could not find app: \(bundleID)")
+                NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, _ in }
             }
         }
     }

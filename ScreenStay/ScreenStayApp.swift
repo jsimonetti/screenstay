@@ -28,7 +28,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var profilesMenu: NSMenu?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        log("🎬 ScreenStay starting...")
+        log("ScreenStay starting")
         
         // Start as menu bar only app (no dock icon)
         NSApp.setActivationPolicy(.accessory)
@@ -75,7 +75,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 object: nil
             )
             
-            log("✅ ScreenStay ready")
+            log("ScreenStay ready")
         }
     }
     
@@ -96,7 +96,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationWillTerminate(_ notification: Notification) {
         eventCoordinator?.stop()
-        log("👋 ScreenStay stopped")
     }
     
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -113,24 +112,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func setupMenuBarAsync() async {
-        log("🎨 Setting up menu bar...")
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
             // Try SF Symbol first, fallback to text
             if let image = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "ScreenStay") {
                 button.image = image
-                log("✅ Menu bar icon set (SF Symbol)")
             } else {
                 button.title = "⊞"
-                log("✅ Menu bar icon set (text)")
             }
-        } else {
-            log("❌ Failed to get status bar button")
         }
         
         let menu = NSMenu()
-        log("📝 Building menu...")
         
         // Profiles submenu
         let profilesMenu = NSMenu()
@@ -194,7 +187,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(quitItem)
         
         statusItem?.menu = menu
-        log("✅ Menu bar setup complete")
     }
     
     private func updateProfilesMenu() {
@@ -204,7 +196,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             profilesMenu.removeAllItems()
             
             if let config = await profileManager?.getConfiguration() {
-                log("🔄 Updating menu: \(config.profiles.count) profiles")
+
                 
                 if config.profiles.isEmpty {
                     // Show helpful message when no profiles exist
@@ -227,7 +219,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     profilesMenu.addItem(addProfileItem)
                 } else {
                     for profile in config.profiles {
-                        log("   - \(profile.name): isActive=\(profile.isActive)")
                         let item = NSMenuItem(
                             title: profile.name,
                             action: #selector(switchProfile(_:)),
@@ -272,8 +263,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 
                 // Rebuild menu to update checkmarks
                 setupMenuBar()
-                
-                log("✅ Switched to profile: \(profile.name)")
             }
         }
     }
@@ -323,7 +312,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if alert.runModal() == .alertFirstButtonReturn {
             do {
                 try "".write(to: logFile, atomically: true, encoding: .utf8)
-                log("🧹 Logs cleared")
                 showAlert(title: "Logs Cleared", message: "All log entries have been deleted.")
             } catch {
                 showAlert(title: "Error", message: "Failed to clear logs: \(error.localizedDescription)")

@@ -13,15 +13,13 @@ class GlobalKeyboardHandler {
         self.shortcuts = shortcuts
         self.onShortcutTriggered = onShortcutTriggered
         
-        log("🎹 Starting keyboard handler with \(shortcuts.count) shortcuts")
+        log("Starting keyboard handler")
         
         // Stop existing tap if any
         stop()
         
         // Create event tap
         let eventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.flagsChanged.rawValue)
-        
-        log("🎹 Creating event tap with mask: \(eventMask)")
         
         guard let eventTap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -34,7 +32,6 @@ class GlobalKeyboardHandler {
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
-            log("❌ Failed to create event tap - Input Monitoring permission may be missing")
             showInputMonitoringAlert()
             return
         }
@@ -45,8 +42,6 @@ class GlobalKeyboardHandler {
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
         CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: eventTap, enable: true)
-        
-        log("✅ Global keyboard handler started with \(shortcuts.count) shortcuts")
     }
     
     private func showInputMonitoringAlert() {
@@ -84,9 +79,7 @@ class GlobalKeyboardHandler {
     }
     
     func updateShortcuts(_ shortcuts: [KeyboardShortcut]) {
-        let oldCount = self.shortcuts.count
         self.shortcuts = shortcuts
-        log("🔄 Updated keyboard shortcuts: \(oldCount) -> \(shortcuts.count)")
     }
     
     private func handleEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
@@ -115,8 +108,6 @@ class GlobalKeyboardHandler {
         // Check if any shortcut matches
         for shortcut in shortcuts {
             if matchesShortcut(shortcut, flags: flags, characters: characters) {
-                log("⌨️ Keyboard shortcut matched: \(shortcut.modifiers.joined(separator: "+"))+\(shortcut.key)")
-                
                 // Trigger handler on main thread
                 Task { @MainActor in
                     self.onShortcutTriggered?(shortcut)

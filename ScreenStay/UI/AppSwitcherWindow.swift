@@ -148,13 +148,10 @@ class AppSwitcherWindow: NSWindow {
         
         setFrameOrigin(NSPoint(x: centerX, y: centerY))
         orderFrontRegardless()
-        
-        log("🔄 App switcher shown at (\(Int(centerX)), \(Int(centerY)))")
     }
     
     /// Hide the window
     func hide() {
         orderOut(nil)
-        log("🔄 App switcher hidden")
     }
 }

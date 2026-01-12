@@ -5,6 +5,7 @@ import AppKit
 class AppSwitcherWindow: NSWindow {
     private let stackView = NSStackView()
     private var appLabels: [String: NSTextField] = [:]
+    private var scale: Double = 1.0
     
     init() {
         super.init(
@@ -33,8 +34,8 @@ class AppSwitcherWindow: NSWindow {
     private func setupUI() {
         stackView.orientation = .vertical
         stackView.alignment = .leading
-        stackView.spacing = 8
-        stackView.edgeInsets = NSEdgeInsets(top: 16, left: 20, bottom: 16, right: 20)
+        stackView.spacing = 8 * scale
+        stackView.edgeInsets = NSEdgeInsets(top: 16 * scale, left: 20 * scale, bottom: 16 * scale, right: 20 * scale)
         
         contentView?.addSubview(stackView)
         stackView.translatesAutoresizingMaskIntoConstraints = false
@@ -47,6 +48,13 @@ class AppSwitcherWindow: NSWindow {
         ])
     }
     
+    /// Set the UI scale and update layout
+    func setScale(_ newScale: Double) {
+        self.scale = newScale
+        stackView.spacing = CGFloat(8 * scale)
+        stackView.edgeInsets = NSEdgeInsets(top: CGFloat(16 * scale), left: CGFloat(20 * scale), bottom: CGFloat(16 * scale), right: CGFloat(20 * scale))
+    }
+    
     /// Update the window with a list of apps
     func updateApps(_ apps: [(bundleID: String, name: String, isRunning: Bool)], selectedIndex: Int) {
         // Clear existing labels
@@ -57,16 +65,17 @@ class AppSwitcherWindow: NSWindow {
             // Create horizontal stack for icon + label
             let rowStack = NSStackView()
             rowStack.orientation = .horizontal
-            rowStack.spacing = 8
+            rowStack.spacing = CGFloat(8 * scale)
             rowStack.alignment = .centerY
             
             // Get app icon
             let iconView = NSImageView()
             iconView.imageScaling = .scaleProportionallyUpOrDown
             iconView.translatesAutoresizingMaskIntoConstraints = false
+            let iconSize = CGFloat(24 * scale)
             NSLayoutConstraint.activate([
-                iconView.widthAnchor.constraint(equalToConstant: 24),
-                iconView.heightAnchor.constraint(equalToConstant: 24)
+                iconView.widthAnchor.constraint(equalToConstant: iconSize),
+                iconView.heightAnchor.constraint(equalToConstant: iconSize)
             ])
             
             if let icon = getAppIcon(bundleID: app.bundleID) {
@@ -78,7 +87,7 @@ class AppSwitcherWindow: NSWindow {
             
             // Create label
             let label = NSTextField(labelWithString: app.name)
-            label.font = .systemFont(ofSize: 14, weight: index == selectedIndex ? .semibold : .regular)
+            label.font = .systemFont(ofSize: 14 * scale, weight: index == selectedIndex ? .semibold : .regular)
             label.textColor = app.isRunning ? .labelColor : .secondaryLabelColor
             label.isBordered = false
             label.isBezeled = false
@@ -93,16 +102,18 @@ class AppSwitcherWindow: NSWindow {
                 
                 let container = NSView()
                 container.wantsLayer = true
-                container.layer?.cornerRadius = 6
+                container.layer?.cornerRadius = CGFloat(6 * scale)
                 container.layer?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.6).cgColor
                 container.addSubview(rowStack)
                 
                 rowStack.translatesAutoresizingMaskIntoConstraints = false
+                let padding = CGFloat(6 * scale)
+                let horizontalPadding = CGFloat(8 * scale)
                 NSLayoutConstraint.activate([
-                    rowStack.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
-                    rowStack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
-                    rowStack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
-                    rowStack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -6)
+                    rowStack.topAnchor.constraint(equalTo: container.topAnchor, constant: padding),
+                    rowStack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
+                    rowStack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
+                    rowStack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -padding)
                 ])
                 
                 stackView.addArrangedSubview(container)
@@ -121,7 +132,7 @@ class AppSwitcherWindow: NSWindow {
         // Resize window to fit content
         stackView.layoutSubtreeIfNeeded()
         let contentSize = stackView.fittingSize
-        setContentSize(NSSize(width: max(300, contentSize.width), height: contentSize.height))
+        setContentSize(NSSize(width: max(CGFloat(300 * scale), contentSize.width), height: contentSize.height))
     }
     
     /// Get the icon for an app by bundle ID

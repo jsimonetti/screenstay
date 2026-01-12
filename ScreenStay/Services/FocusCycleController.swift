@@ -73,10 +73,15 @@ actor FocusCycleController {
         )
         switcherState = state
         
+        // Get scale setting
+        let config = await profileManager.getConfiguration()
+        let scale = config.globalSettings.appSwitcherScale
+        
         // Show switcher UI
         if switcherWindow == nil {
             switcherWindow = AppSwitcherWindow()
         }
+        switcherWindow?.setScale(scale)
         switcherWindow?.updateApps(apps, selectedIndex: initialIndex)
         switcherWindow?.show(centeredIn: region.frame)
         

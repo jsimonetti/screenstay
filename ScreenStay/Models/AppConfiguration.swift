@@ -16,9 +16,10 @@ struct AppConfiguration: Codable, Sendable {
         var showFocusedWindowBorder: Bool
         var focusedWindowBorderColor: String
         var focusedWindowBorderWidth: Double
+        var appSwitcherScale: Double
         
         enum CodingKeys: String, CodingKey {
-            case enableAutoProfileSwitch, repositionOnAppLaunch, repositionOnDisplayChange, requireConfirmToLaunchApps, resetWindowShortcut, focusWindowShortcut, showFocusedWindowBorder, focusedWindowBorderColor, focusedWindowBorderWidth
+            case enableAutoProfileSwitch, repositionOnAppLaunch, repositionOnDisplayChange, requireConfirmToLaunchApps, resetWindowShortcut, focusWindowShortcut, showFocusedWindowBorder, focusedWindowBorderColor, focusedWindowBorderWidth, appSwitcherScale
         }
         
         init(from decoder: Decoder) throws {
@@ -32,6 +33,7 @@ struct AppConfiguration: Codable, Sendable {
             showFocusedWindowBorder = try container.decodeIfPresent(Bool.self, forKey: .showFocusedWindowBorder) ?? false
             focusedWindowBorderColor = try container.decodeIfPresent(String.self, forKey: .focusedWindowBorderColor) ?? "#FF6B00"
             focusedWindowBorderWidth = try container.decodeIfPresent(Double.self, forKey: .focusedWindowBorderWidth) ?? 4.0
+            appSwitcherScale = try container.decodeIfPresent(Double.self, forKey: .appSwitcherScale) ?? 1.0
         }
         
         init(
@@ -43,7 +45,8 @@ struct AppConfiguration: Codable, Sendable {
             focusWindowShortcut: KeyboardShortcut? = nil,
             showFocusedWindowBorder: Bool = false,
             focusedWindowBorderColor: String = "#FF6B00",
-            focusedWindowBorderWidth: Double = 4.0
+            focusedWindowBorderWidth: Double = 4.0,
+            appSwitcherScale: Double = 1.0
         ) {
             self.enableAutoProfileSwitch = enableAutoProfileSwitch
             self.repositionOnAppLaunch = repositionOnAppLaunch
@@ -54,6 +57,7 @@ struct AppConfiguration: Codable, Sendable {
             self.showFocusedWindowBorder = showFocusedWindowBorder
             self.focusedWindowBorderColor = focusedWindowBorderColor
             self.focusedWindowBorderWidth = focusedWindowBorderWidth
+            self.appSwitcherScale = appSwitcherScale
         }
         
         static let `default` = GlobalSettings(

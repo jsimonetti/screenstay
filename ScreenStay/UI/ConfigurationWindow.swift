@@ -42,14 +42,16 @@ class ConfigurationWindow: NSWindowController {
     private var focusWindowShortcutRecorder: KeyboardShortcutRecorder?
     private let showBorderCheckbox = NSButton()
     private let borderColorField = NSTextField()
+    private let borderColorWell = NSColorWell()
     private let borderWidthField = NSTextField()
+    private let appSwitcherScaleField = NSTextField()
     
     init(profileManager: ProfileManager, eventCoordinator: EventCoordinator) {
         self.profileManager = profileManager
         self.eventCoordinator = eventCoordinator
         
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 750),
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
@@ -104,6 +106,7 @@ class ConfigurationWindow: NSWindowController {
         setupProfilesTab()
         setupRegionsTab()
         setupGlobalSettingsTab()
+        setupAppearanceTab()
     }
     
     // MARK: - Profiles Tab
@@ -610,7 +613,13 @@ class ConfigurationWindow: NSWindowController {
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.orientation = .vertical
         stackView.alignment = .leading
-        stackView.spacing = 20
+        stackView.spacing = 12
+        
+        // SECTION: Window Behavior
+        let behaviorHeader = NSTextField(labelWithString: "Window Behavior")
+        behaviorHeader.font = .systemFont(ofSize: 14, weight: .semibold)
+        behaviorHeader.textColor = .labelColor
+        stackView.addArrangedSubview(behaviorHeader)
         
         // Auto-switch profiles
         autoSwitchCheckbox.setButtonType(.switch)
@@ -618,6 +627,7 @@ class ConfigurationWindow: NSWindowController {
         autoSwitchCheckbox.state = config?.globalSettings.enableAutoProfileSwitch ?? true ? .on : .off
         autoSwitchCheckbox.target = self
         autoSwitchCheckbox.action = #selector(settingsChanged)
+        autoSwitchCheckbox.toolTip = "When you connect or disconnect displays, ScreenStay will automatically select the matching profile and reposition windows"
         stackView.addArrangedSubview(autoSwitchCheckbox)
         
         // Auto-reposition windows
@@ -626,19 +636,48 @@ class ConfigurationWindow: NSWindowController {
         autoRepositionCheckbox.state = config?.globalSettings.repositionOnAppLaunch ?? true ? .on : .off
         autoRepositionCheckbox.target = self
         autoRepositionCheckbox.action = #selector(settingsChanged)
+        autoRepositionCheckbox.toolTip = "When an app launches, its windows will automatically move to their assigned regions"
         stackView.addArrangedSubview(autoRepositionCheckbox)
         
         // Require confirm for launch
         requireConfirmCheckbox.setButtonType(.switch)
-        requireConfirmCheckbox.title = "Require confirmation before launching unstarted apps"
+        requireConfirmCheckbox.title = "Require confirmation before launching apps"
         requireConfirmCheckbox.state = config?.globalSettings.requireConfirmToLaunchApps ?? false ? .on : .off
         requireConfirmCheckbox.target = self
         requireConfirmCheckbox.action = #selector(settingsChanged)
+        requireConfirmCheckbox.toolTip = "Show a confirmation dialog when using the app switcher to launch apps that aren't running"
         stackView.addArrangedSubview(requireConfirmCheckbox)
         
+        // Spacing before next section
+        let spacer1 = NSView()
+        spacer1.translatesAutoresizingMaskIntoConstraints = false
+        spacer1.heightAnchor.constraint(equalToConstant: 8).isActive = true
+        stackView.addArrangedSubview(spacer1)
+        
+        // SECTION: Keyboard Shortcuts
+        let shortcutsHeader = NSTextField(labelWithString: "Keyboard Shortcuts")
+        shortcutsHeader.font = .systemFont(ofSize: 14, weight: .semibold)
+        shortcutsHeader.textColor = .labelColor
+        stackView.addArrangedSubview(shortcutsHeader)
+        
+        let shortcutsHelp = NSTextField(labelWithString: "Configure global keyboard shortcuts. Region-specific shortcuts are set in the Regions tab.")
+        shortcutsHelp.font = .systemFont(ofSize: 11)
+        shortcutsHelp.textColor = .secondaryLabelColor
+        shortcutsHelp.isEditable = false
+        shortcutsHelp.isBordered = false
+        shortcutsHelp.drawsBackground = false
+        shortcutsHelp.lineBreakMode = .byWordWrapping
+        shortcutsHelp.maximumNumberOfLines = 2
+        shortcutsHelp.translatesAutoresizingMaskIntoConstraints = false
+        stackView.addArrangedSubview(shortcutsHelp)
+        NSLayoutConstraint.activate([
+            shortcutsHelp.widthAnchor.constraint(equalToConstant: 500)
+        ])
+        
         // Reset window keyboard shortcut
-        let shortcutLabel = NSTextField(labelWithString: "Reset Window to Region Shortcut:")
-        shortcutLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        let shortcutLabel = NSTextField(labelWithString: "Reset Window to Region:")
+        shortcutLabel.font = .systemFont(ofSize: 13)
+        shortcutLabel.toolTip = "Moves the currently focused window back to its assigned region"
         stackView.addArrangedSubview(shortcutLabel)
         
         let recorder = KeyboardShortcutRecorder()
@@ -661,8 +700,9 @@ class ConfigurationWindow: NSWindowController {
         ])
         
         // Focus window keyboard shortcut
-        let focusShortcutLabel = NSTextField(labelWithString: "Focus Window to Region Shortcut:")
-        focusShortcutLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        let focusShortcutLabel = NSTextField(labelWithString: "Focus Window to Region:")
+        focusShortcutLabel.font = .systemFont(ofSize: 13)
+        focusShortcutLabel.toolTip = "Cycles focus through apps in the region where the cursor is located"
         stackView.addArrangedSubview(focusShortcutLabel)
         
         let focusRecorder = KeyboardShortcutRecorder()
@@ -684,17 +724,53 @@ class ConfigurationWindow: NSWindowController {
             focusRecorder.heightAnchor.constraint(equalToConstant: 30)
         ])
         
-        // Separator
-        let separator = NSBox()
-        separator.boxType = .separator
-        separator.translatesAutoresizingMaskIntoConstraints = false
-        stackView.addArrangedSubview(separator)
+        containerView.addSubview(stackView)
+        
         NSLayoutConstraint.activate([
-            separator.widthAnchor.constraint(equalToConstant: 400),
-            separator.heightAnchor.constraint(equalToConstant: 1)
+            stackView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 40),
+            stackView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 40),
+            stackView.trailingAnchor.constraint(lessThanOrEqualTo: containerView.trailingAnchor, constant: -40)
         ])
         
-        // Show focused window border
+        tabItem.view = containerView
+        tabView.addTabViewItem(tabItem)
+    }
+    
+    // MARK: - Appearance Tab
+    
+    private func setupAppearanceTab() {
+        let tabItem = NSTabViewItem(identifier: "appearance")
+        tabItem.label = "Appearance"
+        
+        let containerView = NSView()
+        
+        let stackView = NSStackView()
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.orientation = .vertical
+        stackView.alignment = .leading
+        stackView.spacing = 12
+        
+        // SECTION: Focused Window Border
+        let borderHeader = NSTextField(labelWithString: "Focused Window Border")
+        borderHeader.font = .systemFont(ofSize: 14, weight: .semibold)
+        borderHeader.textColor = .labelColor
+        stackView.addArrangedSubview(borderHeader)
+        
+        let borderHelp = NSTextField(labelWithString: "Display a colored border around the window that currently has keyboard focus.")
+        borderHelp.font = .systemFont(ofSize: 11)
+        borderHelp.textColor = .secondaryLabelColor
+        borderHelp.isEditable = false
+        borderHelp.isBordered = false
+        borderHelp.drawsBackground = false
+        borderHelp.lineBreakMode = .byWordWrapping
+        borderHelp.maximumNumberOfLines = 2
+        borderHelp.translatesAutoresizingMaskIntoConstraints = false
+        stackView.addArrangedSubview(borderHelp)
+        NSLayoutConstraint.activate([
+            borderHelp.widthAnchor.constraint(equalToConstant: 500)
+        ])
+        
+        // Show focused window border checkbox
         showBorderCheckbox.setButtonType(.switch)
         showBorderCheckbox.title = "Show border around focused window"
         showBorderCheckbox.state = config?.globalSettings.showFocusedWindowBorder ?? false ? .on : .off
@@ -708,13 +784,32 @@ class ConfigurationWindow: NSWindowController {
         colorContainer.spacing = 10
         colorContainer.alignment = .centerY
         
-        let colorLabel = NSTextField(labelWithString: "Border Color (hex):")
-        colorLabel.font = .systemFont(ofSize: 13)
+        let colorLabel = NSTextField(labelWithString: "   Color:")
+        colorLabel.font = .systemFont(ofSize: 12)
+        colorLabel.textColor = .secondaryLabelColor
         colorContainer.addArrangedSubview(colorLabel)
         
+        // Color well (color picker)
+        let initialColor = NSColor.from(hex: config?.globalSettings.focusedWindowBorderColor ?? "#FF6B00") ?? .orange
+        borderColorWell.color = initialColor
+        borderColorWell.translatesAutoresizingMaskIntoConstraints = false
+        borderColorWell.target = self
+        borderColorWell.action = #selector(borderColorChanged)
+        borderColorWell.toolTip = "Click to choose border color"
+        colorContainer.addArrangedSubview(borderColorWell)
+        
+        NSLayoutConstraint.activate([
+            borderColorWell.widthAnchor.constraint(equalToConstant: 50),
+            borderColorWell.heightAnchor.constraint(equalToConstant: 26)
+        ])
+        
+        // Hex text field
         borderColorField.stringValue = config?.globalSettings.focusedWindowBorderColor ?? "#FF6B00"
         borderColorField.placeholderString = "#FF6B00"
         borderColorField.translatesAutoresizingMaskIntoConstraints = false
+        borderColorField.toolTip = "Border color in hex format (e.g., #FF6B00)"
+        borderColorField.target = self
+        borderColorField.action = #selector(borderColorHexChanged)
         colorContainer.addArrangedSubview(borderColorField)
         
         NSLayoutConstraint.activate([
@@ -729,20 +824,80 @@ class ConfigurationWindow: NSWindowController {
         widthContainer.spacing = 10
         widthContainer.alignment = .centerY
         
-        let widthLabel = NSTextField(labelWithString: "Border Width (px):")
-        widthLabel.font = .systemFont(ofSize: 13)
+        let widthLabel = NSTextField(labelWithString: "   Width (pixels):")
+        widthLabel.font = .systemFont(ofSize: 12)
+        widthLabel.textColor = .secondaryLabelColor
         widthContainer.addArrangedSubview(widthLabel)
         
         borderWidthField.stringValue = "\(Int(config?.globalSettings.focusedWindowBorderWidth ?? 4.0))"
         borderWidthField.placeholderString = "4"
         borderWidthField.translatesAutoresizingMaskIntoConstraints = false
+        borderWidthField.toolTip = "Border thickness in pixels (1-20)"
         widthContainer.addArrangedSubview(borderWidthField)
+        
+        let widthHint = NSTextField(labelWithString: "(1-20)")
+        widthHint.textColor = .tertiaryLabelColor
+        widthHint.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        widthContainer.addArrangedSubview(widthHint)
         
         NSLayoutConstraint.activate([
             borderWidthField.widthAnchor.constraint(equalToConstant: 60)
         ])
         
         stackView.addArrangedSubview(widthContainer)
+        
+        // Spacing between sections
+        let spacer = NSView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        spacer.heightAnchor.constraint(equalToConstant: 16).isActive = true
+        stackView.addArrangedSubview(spacer)
+        
+        // SECTION: App Switcher
+        let switcherHeader = NSTextField(labelWithString: "App Switcher")
+        switcherHeader.font = .systemFont(ofSize: 14, weight: .semibold)
+        switcherHeader.textColor = .labelColor
+        stackView.addArrangedSubview(switcherHeader)
+        
+        let switcherHelp = NSTextField(labelWithString: "The app switcher appears when cycling through apps assigned to a region. Adjust its size to match your preference.")
+        switcherHelp.font = .systemFont(ofSize: 11)
+        switcherHelp.textColor = .secondaryLabelColor
+        switcherHelp.isEditable = false
+        switcherHelp.isBordered = false
+        switcherHelp.drawsBackground = false
+        switcherHelp.lineBreakMode = .byWordWrapping
+        switcherHelp.maximumNumberOfLines = 2
+        switcherHelp.translatesAutoresizingMaskIntoConstraints = false
+        stackView.addArrangedSubview(switcherHelp)
+        NSLayoutConstraint.activate([
+            switcherHelp.widthAnchor.constraint(equalToConstant: 500)
+        ])
+        
+        // App Switcher Scale
+        let scaleContainer = NSStackView()
+        scaleContainer.orientation = .horizontal
+        scaleContainer.spacing = 8
+        scaleContainer.alignment = .centerY
+        
+        let scaleLabel = NSTextField(labelWithString: "Scale:")
+        scaleLabel.font = .systemFont(ofSize: 13)
+        scaleContainer.addArrangedSubview(scaleLabel)
+        
+        appSwitcherScaleField.stringValue = String(format: "%.1f", config?.globalSettings.appSwitcherScale ?? 1.0)
+        appSwitcherScaleField.placeholderString = "1.0"
+        appSwitcherScaleField.translatesAutoresizingMaskIntoConstraints = false
+        appSwitcherScaleField.toolTip = "Scale factor: 1.0 = normal, 0.5 = half size, 2.0 = double size"
+        scaleContainer.addArrangedSubview(appSwitcherScaleField)
+        
+        NSLayoutConstraint.activate([
+            appSwitcherScaleField.widthAnchor.constraint(equalToConstant: 60)
+        ])
+        
+        let scaleHint = NSTextField(labelWithString: "(0.5-2.0)")
+        scaleHint.textColor = .tertiaryLabelColor
+        scaleHint.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        scaleContainer.addArrangedSubview(scaleHint)
+        
+        stackView.addArrangedSubview(scaleContainer)
         
         containerView.addSubview(stackView)
         
@@ -778,6 +933,18 @@ class ConfigurationWindow: NSWindowController {
         }
     }
     
+    @objc private func borderColorChanged() {
+        // Update hex field when color well changes
+        borderColorField.stringValue = borderColorWell.color.toHex()
+    }
+    
+    @objc private func borderColorHexChanged() {
+        // Update color well when hex field changes
+        if let color = NSColor.from(hex: borderColorField.stringValue) {
+            borderColorWell.color = color
+        }
+    }
+    
     // MARK: - Public Methods
     
     func show() {
@@ -800,6 +967,17 @@ class ConfigurationWindow: NSWindowController {
                 if let shortcut = config.globalSettings.focusWindowShortcut {
                     focusWindowShortcutRecorder?.setShortcut(modifiers: shortcut.modifiers, key: shortcut.key)
                 }
+                
+                // Update border settings
+                showBorderCheckbox.state = config.globalSettings.showFocusedWindowBorder ? .on : .off
+                borderColorField.stringValue = config.globalSettings.focusedWindowBorderColor
+                if let color = NSColor.from(hex: config.globalSettings.focusedWindowBorderColor) {
+                    borderColorWell.color = color
+                }
+                borderWidthField.stringValue = "\(Int(config.globalSettings.focusedWindowBorderWidth))"
+                
+                // Update app switcher scale
+                appSwitcherScaleField.stringValue = String(format: "%.1f", config.globalSettings.appSwitcherScale)
             }
             
             // Select the active profile (or first profile if none active)
@@ -869,6 +1047,13 @@ class ConfigurationWindow: NSWindowController {
             config.globalSettings.focusedWindowBorderWidth = 4.0
         }
         
+        // Update app switcher scale
+        if let scale = Double(appSwitcherScaleField.stringValue), scale >= 0.5 && scale <= 2.0 {
+            config.globalSettings.appSwitcherScale = scale
+        } else {
+            config.globalSettings.appSwitcherScale = 1.0
+        }
+        
         Task {
             do {
                 // Update the profile manager's configuration
@@ -877,14 +1062,12 @@ class ConfigurationWindow: NSWindowController {
                 // Save to disk
                 try await profileManager.save()
                 
-                // Reload configuration
+                // Reload configuration from disk
                 try await profileManager.reload()
                 
-                // Update keyboard shortcuts to reflect changes
-                await self.eventCoordinator?.updateKeyboardShortcuts()
-                
-                // Update border overlay settings
-                await self.eventCoordinator?.updateBorderSettings()
+                // Restart event coordinator to apply all changes fresh
+                self.eventCoordinator?.stop()
+                await self.eventCoordinator?.start()
                 
                 await MainActor.run {
                     // Close the settings window

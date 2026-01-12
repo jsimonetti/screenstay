@@ -10,7 +10,7 @@ SWIFTC = swiftc
 SWIFT_FLAGS = -framework AppKit -framework ApplicationServices
 SOURCES = $(shell find ScreenStay -name "*.swift")
 ENTITLEMENTS = ScreenStay/ScreenStay.entitlements
-SIGNING_IDENTITY = "screenstay-codesign-certificate"
+SIGNING_IDENTITY = 'ScreenStay Code Signing'
 
 .PHONY: all build clean run install sign
 

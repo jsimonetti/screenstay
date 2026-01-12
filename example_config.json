@@ -3,7 +3,11 @@
     "enableAutoProfileSwitch" : true,
     "repositionOnAppLaunch" : true,
     "repositionOnDisplayChange" : true,
-    "requireConfirmToLaunchApps" : false
+    "requireConfirmToLaunchApps" : false,
+    "resetWindowShortcut" : {
+      "modifiers" : ["cmd", "option"],
+      "key" : "r"
+    }
   },
   "profiles" : [
     {

@@ -11,9 +11,10 @@ struct AppConfiguration: Codable, Sendable {
         var repositionOnAppLaunch: Bool
         var repositionOnDisplayChange: Bool
         var requireConfirmToLaunchApps: Bool
+        var resetWindowShortcut: KeyboardShortcut?
         
         enum CodingKeys: String, CodingKey {
-            case enableAutoProfileSwitch, repositionOnAppLaunch, repositionOnDisplayChange, requireConfirmToLaunchApps
+            case enableAutoProfileSwitch, repositionOnAppLaunch, repositionOnDisplayChange, requireConfirmToLaunchApps, resetWindowShortcut
         }
         
         init(from decoder: Decoder) throws {
@@ -22,25 +23,29 @@ struct AppConfiguration: Codable, Sendable {
             repositionOnAppLaunch = try container.decode(Bool.self, forKey: .repositionOnAppLaunch)
             repositionOnDisplayChange = try container.decode(Bool.self, forKey: .repositionOnDisplayChange)
             requireConfirmToLaunchApps = try container.decodeIfPresent(Bool.self, forKey: .requireConfirmToLaunchApps) ?? false
+            resetWindowShortcut = try container.decodeIfPresent(KeyboardShortcut.self, forKey: .resetWindowShortcut)
         }
         
         init(
             enableAutoProfileSwitch: Bool,
             repositionOnAppLaunch: Bool,
             repositionOnDisplayChange: Bool,
-            requireConfirmToLaunchApps: Bool
+            requireConfirmToLaunchApps: Bool,
+            resetWindowShortcut: KeyboardShortcut? = nil
         ) {
             self.enableAutoProfileSwitch = enableAutoProfileSwitch
             self.repositionOnAppLaunch = repositionOnAppLaunch
             self.repositionOnDisplayChange = repositionOnDisplayChange
             self.requireConfirmToLaunchApps = requireConfirmToLaunchApps
+            self.resetWindowShortcut = resetWindowShortcut
         }
         
         static let `default` = GlobalSettings(
             enableAutoProfileSwitch: true,
             repositionOnAppLaunch: true,
             repositionOnDisplayChange: true,
-            requireConfirmToLaunchApps: false
+            requireConfirmToLaunchApps: false,
+            resetWindowShortcut: KeyboardShortcut(modifiers: ["cmd", "option"], key: "r")
         )
     }
     

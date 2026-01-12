@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 class ConfigurationWindow: NSWindowController {
     private let profileManager: ProfileManager
+    private weak var eventCoordinator: EventCoordinator?
     private let overlayManager = RegionOverlayManager()
     
     private var config: AppConfiguration?
@@ -36,9 +37,11 @@ class ConfigurationWindow: NSWindowController {
     private let autoSwitchCheckbox = NSButton()
     private let autoRepositionCheckbox = NSButton()
     private let requireConfirmCheckbox = NSButton()
+    private var resetWindowShortcutRecorder: KeyboardShortcutRecorder?
     
-    init(profileManager: ProfileManager) {
+    init(profileManager: ProfileManager, eventCoordinator: EventCoordinator) {
         self.profileManager = profileManager
+        self.eventCoordinator = eventCoordinator
         
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
@@ -621,6 +624,30 @@ class ConfigurationWindow: NSWindowController {
         requireConfirmCheckbox.action = #selector(settingsChanged)
         stackView.addArrangedSubview(requireConfirmCheckbox)
         
+        // Reset window keyboard shortcut
+        let shortcutLabel = NSTextField(labelWithString: "Reset Window to Region Shortcut:")
+        shortcutLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        stackView.addArrangedSubview(shortcutLabel)
+        
+        let recorder = KeyboardShortcutRecorder()
+        recorder.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Set initial shortcut from config
+        if let shortcut = config?.globalSettings.resetWindowShortcut {
+            recorder.setShortcut(modifiers: shortcut.modifiers, key: shortcut.key)
+        }
+        
+        recorder.onShortcutChanged = { [weak self] shortcutTuple in
+            self?.resetWindowShortcutChanged(shortcutTuple)
+        }
+        self.resetWindowShortcutRecorder = recorder
+        stackView.addArrangedSubview(recorder)
+        
+        NSLayoutConstraint.activate([
+            recorder.widthAnchor.constraint(equalToConstant: 300),
+            recorder.heightAnchor.constraint(equalToConstant: 30)
+        ])
+        
         containerView.addSubview(stackView)
         
         NSLayoutConstraint.activate([
@@ -638,6 +665,17 @@ class ConfigurationWindow: NSWindowController {
         // TODO: Save to config
     }
     
+    private func resetWindowShortcutChanged(_ shortcutTuple: (modifiers: [String], key: String)?) {
+        // Convert tuple to KeyboardShortcut
+        if let tuple = shortcutTuple {
+            config?.globalSettings.resetWindowShortcut = KeyboardShortcut(modifiers: tuple.modifiers, key: tuple.key)
+            log("⌨️ Reset window shortcut changed to: \(tuple.modifiers.joined(separator: "+"))+\(tuple.key)")
+        } else {
+            config?.globalSettings.resetWindowShortcut = nil
+            log("⌨️ Reset window shortcut cleared")
+        }
+    }
+    
     // MARK: - Public Methods
     
     func show() {
@@ -646,6 +684,18 @@ class ConfigurationWindow: NSWindowController {
             populateProfileSelector()
             profilesTableView.reloadData()
             regionsTableView.reloadData()
+            
+            // Update global settings UI with loaded config
+            if let config = config {
+                autoSwitchCheckbox.state = config.globalSettings.enableAutoProfileSwitch ? .on : .off
+                autoRepositionCheckbox.state = config.globalSettings.repositionOnAppLaunch ? .on : .off
+                requireConfirmCheckbox.state = config.globalSettings.requireConfirmToLaunchApps ? .on : .off
+                
+                // Update shortcut recorder with loaded config
+                if let shortcut = config.globalSettings.resetWindowShortcut {
+                    resetWindowShortcutRecorder?.setShortcut(modifiers: shortcut.modifiers, key: shortcut.key)
+                }
+            }
             
             // Select the active profile (or first profile if none active)
             if let config = config {
@@ -681,14 +731,25 @@ class ConfigurationWindow: NSWindowController {
         overlayManager.hideOverlays(saveChanges: false)
         super.close()
         
-        // Hide app from dock when settings closes
-        NSApp.setActivationPolicy(.accessory)
+        // Activation policy is managed at app level via window close notification
     }
     
     @objc private func saveConfiguration() {
-        guard let config = config else { return }
+        guard var config = config else { return }
         
         log("💾 Saving configuration...")
+        
+        // Update global settings from UI
+        config.globalSettings.enableAutoProfileSwitch = autoSwitchCheckbox.state == .on
+        config.globalSettings.repositionOnAppLaunch = autoRepositionCheckbox.state == .on
+        config.globalSettings.requireConfirmToLaunchApps = requireConfirmCheckbox.state == .on
+        
+        // Get current shortcut from recorder
+        if let shortcutTuple = resetWindowShortcutRecorder?.currentShortcut {
+            config.globalSettings.resetWindowShortcut = KeyboardShortcut(modifiers: shortcutTuple.modifiers, key: shortcutTuple.key)
+        } else {
+            config.globalSettings.resetWindowShortcut = nil
+        }
         
         Task {
             do {
@@ -700,6 +761,9 @@ class ConfigurationWindow: NSWindowController {
                 
                 // Reload configuration
                 try await profileManager.reload()
+                
+                // Update keyboard shortcuts to reflect changes
+                await self.eventCoordinator?.updateKeyboardShortcuts()
                 
                 await MainActor.run {
                     log("✅ Configuration saved and reloaded successfully")

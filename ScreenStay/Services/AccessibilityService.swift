@@ -116,4 +116,79 @@ class AccessibilityService {
         setWindowPosition(window, to: frame.origin)
         setWindowSize(window, to: frame.size)
     }
+    
+    /// Get the CGWindowID for an AXUIElement window
+    func getWindowID(_ window: AXUIElement) -> CGWindowID? {
+        // Try to get the window ID via private attribute (undocumented but works)
+        var value: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(window, "AXWindowID" as CFString, &value)
+        
+        if result == .success, let number = value as? NSNumber {
+            return number.uint32Value
+        }
+        
+        // Fallback: try to match by position and size using CGWindowList
+        guard let position = getWindowPosition(window),
+              let size = getWindowSize(window) else {
+            return nil
+        }
+        
+        // Get window list and find matching window
+        guard let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+            return nil
+        }
+        
+        for windowDict in windowList {
+            guard let boundsDict = windowDict[kCGWindowBounds as String] as? [String: CGFloat],
+                  let x = boundsDict["X"],
+                  let y = boundsDict["Y"],
+                  let width = boundsDict["Width"],
+                  let height = boundsDict["Height"] else {
+                continue
+            }
+            
+            // Match by position and size (within 1px tolerance)
+            if abs(x - position.x) < 1 && abs(y - position.y) < 1 &&
+               abs(width - size.width) < 1 && abs(height - size.height) < 1 {
+                if let id = windowDict[kCGWindowNumber as String] as? CGWindowID {
+                    return id
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    /// Check if a window should be positioned (filters out system dialogs, sheets, etc.)
+    func shouldPositionWindow(_ window: AXUIElement) -> Bool {
+        // Check subrole - dialogs, sheets, and floating windows should not be positioned
+        var subroleValue: CFTypeRef?
+        let subroleResult = AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &subroleValue)
+        
+        if subroleResult == .success, let subrole = subroleValue as? String {
+            let excludedSubroles = [
+                kAXDialogSubrole as String,          // Standard dialogs (open/save)
+                kAXSystemDialogSubrole as String,    // System-level dialogs
+                kAXFloatingWindowSubrole as String,  // Floating palettes/inspectors
+                kAXSheetRole as String               // Modal sheets
+            ]
+            
+            if excludedSubroles.contains(subrole) {
+                return false
+            }
+        }
+        
+        // Check role - sheets should never be positioned
+        var roleValue: CFTypeRef?
+        let roleResult = AXUIElementCopyAttributeValue(window, kAXRoleAttribute as CFString, &roleValue)
+        
+        if roleResult == .success, let role = roleValue as? String {
+            if role == kAXSheetRole as String {
+                return false
+            }
+        }
+        
+        return true
+    }
 }
+

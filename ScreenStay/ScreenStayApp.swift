@@ -30,6 +30,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         log("🎬 ScreenStay starting...")
         
+        // Start as menu bar only app (no dock icon)
+        NSApp.setActivationPolicy(.accessory)
+        
         // Check all permissions
         PermissionManager.checkAndRequestPermissions()
         
@@ -64,7 +67,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Update menu to reflect active profile
             updateProfilesMenu()
             
+            // Observe window lifecycle to manage dock visibility
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowWillClose),
+                name: NSWindow.willCloseNotification,
+                object: nil
+            )
+            
             log("✅ ScreenStay ready")
+        }
+    }
+    
+    @objc private func windowWillClose(_ notification: Notification) {
+        // When any window closes, check if we should hide from dock
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            let visibleWindows = NSApp.windows.filter { 
+                $0.isVisible && 
+                !$0.className.contains("NSStatusBarWindow") &&
+                !$0.className.contains("NSMenuWindow")
+            }
+            
+            if visibleWindows.isEmpty {
+                NSApp.setActivationPolicy(.accessory)
+            }
         }
     }
     
@@ -219,8 +245,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func showSettings() {
         // Lazy initialize configuration window if needed
-        if configurationWindow == nil, let profileManager = profileManager {
-            configurationWindow = ConfigurationWindow(profileManager: profileManager)
+        if configurationWindow == nil, let profileManager = profileManager, let eventCoordinator = eventCoordinator {
+            configurationWindow = ConfigurationWindow(profileManager: profileManager, eventCoordinator: eventCoordinator)
         }
         
         // Make app visible in dock when settings window opens

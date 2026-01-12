@@ -2,7 +2,7 @@
 
 APP_NAME = ScreenStay
 BUNDLE_ID = com.simonetti.ScreenStay
-VERSION = 1.0.0
+VERSION = 1.0.1
 BUILD_DIR = build
 APP_BUNDLE = $(BUILD_DIR)/$(APP_NAME).app
 

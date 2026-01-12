@@ -40,6 +40,9 @@ class ConfigurationWindow: NSWindowController {
     private let requireConfirmCheckbox = NSButton()
     private var resetWindowShortcutRecorder: KeyboardShortcutRecorder?
     private var focusWindowShortcutRecorder: KeyboardShortcutRecorder?
+    private let showBorderCheckbox = NSButton()
+    private let borderColorField = NSTextField()
+    private let borderWidthField = NSTextField()
     
     init(profileManager: ProfileManager, eventCoordinator: EventCoordinator) {
         self.profileManager = profileManager
@@ -681,6 +684,66 @@ class ConfigurationWindow: NSWindowController {
             focusRecorder.heightAnchor.constraint(equalToConstant: 30)
         ])
         
+        // Separator
+        let separator = NSBox()
+        separator.boxType = .separator
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        stackView.addArrangedSubview(separator)
+        NSLayoutConstraint.activate([
+            separator.widthAnchor.constraint(equalToConstant: 400),
+            separator.heightAnchor.constraint(equalToConstant: 1)
+        ])
+        
+        // Show focused window border
+        showBorderCheckbox.setButtonType(.switch)
+        showBorderCheckbox.title = "Show border around focused window"
+        showBorderCheckbox.state = config?.globalSettings.showFocusedWindowBorder ?? false ? .on : .off
+        showBorderCheckbox.target = self
+        showBorderCheckbox.action = #selector(settingsChanged)
+        stackView.addArrangedSubview(showBorderCheckbox)
+        
+        // Border color
+        let colorContainer = NSStackView()
+        colorContainer.orientation = .horizontal
+        colorContainer.spacing = 10
+        colorContainer.alignment = .centerY
+        
+        let colorLabel = NSTextField(labelWithString: "Border Color (hex):")
+        colorLabel.font = .systemFont(ofSize: 13)
+        colorContainer.addArrangedSubview(colorLabel)
+        
+        borderColorField.stringValue = config?.globalSettings.focusedWindowBorderColor ?? "#FF6B00"
+        borderColorField.placeholderString = "#FF6B00"
+        borderColorField.translatesAutoresizingMaskIntoConstraints = false
+        colorContainer.addArrangedSubview(borderColorField)
+        
+        NSLayoutConstraint.activate([
+            borderColorField.widthAnchor.constraint(equalToConstant: 100)
+        ])
+        
+        stackView.addArrangedSubview(colorContainer)
+        
+        // Border width
+        let widthContainer = NSStackView()
+        widthContainer.orientation = .horizontal
+        widthContainer.spacing = 10
+        widthContainer.alignment = .centerY
+        
+        let widthLabel = NSTextField(labelWithString: "Border Width (px):")
+        widthLabel.font = .systemFont(ofSize: 13)
+        widthContainer.addArrangedSubview(widthLabel)
+        
+        borderWidthField.stringValue = "\(Int(config?.globalSettings.focusedWindowBorderWidth ?? 4.0))"
+        borderWidthField.placeholderString = "4"
+        borderWidthField.translatesAutoresizingMaskIntoConstraints = false
+        widthContainer.addArrangedSubview(borderWidthField)
+        
+        NSLayoutConstraint.activate([
+            borderWidthField.widthAnchor.constraint(equalToConstant: 60)
+        ])
+        
+        stackView.addArrangedSubview(widthContainer)
+        
         containerView.addSubview(stackView)
         
         NSLayoutConstraint.activate([
@@ -797,6 +860,15 @@ class ConfigurationWindow: NSWindowController {
             config.globalSettings.focusWindowShortcut = nil
         }
         
+        // Update border settings
+        config.globalSettings.showFocusedWindowBorder = showBorderCheckbox.state == .on
+        config.globalSettings.focusedWindowBorderColor = borderColorField.stringValue.isEmpty ? "#FF6B00" : borderColorField.stringValue
+        if let width = Double(borderWidthField.stringValue), width > 0 && width <= 20 {
+            config.globalSettings.focusedWindowBorderWidth = width
+        } else {
+            config.globalSettings.focusedWindowBorderWidth = 4.0
+        }
+        
         Task {
             do {
                 // Update the profile manager's configuration
@@ -810,6 +882,9 @@ class ConfigurationWindow: NSWindowController {
                 
                 // Update keyboard shortcuts to reflect changes
                 await self.eventCoordinator?.updateKeyboardShortcuts()
+                
+                // Update border overlay settings
+                await self.eventCoordinator?.updateBorderSettings()
                 
                 await MainActor.run {
                     // Close the settings window

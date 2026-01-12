@@ -13,9 +13,12 @@ struct AppConfiguration: Codable, Sendable {
         var requireConfirmToLaunchApps: Bool
         var resetWindowShortcut: KeyboardShortcut?
         var focusWindowShortcut: KeyboardShortcut?
+        var showFocusedWindowBorder: Bool
+        var focusedWindowBorderColor: String
+        var focusedWindowBorderWidth: Double
         
         enum CodingKeys: String, CodingKey {
-            case enableAutoProfileSwitch, repositionOnAppLaunch, repositionOnDisplayChange, requireConfirmToLaunchApps, resetWindowShortcut, focusWindowShortcut
+            case enableAutoProfileSwitch, repositionOnAppLaunch, repositionOnDisplayChange, requireConfirmToLaunchApps, resetWindowShortcut, focusWindowShortcut, showFocusedWindowBorder, focusedWindowBorderColor, focusedWindowBorderWidth
         }
         
         init(from decoder: Decoder) throws {
@@ -26,6 +29,9 @@ struct AppConfiguration: Codable, Sendable {
             requireConfirmToLaunchApps = try container.decodeIfPresent(Bool.self, forKey: .requireConfirmToLaunchApps) ?? false
             resetWindowShortcut = try container.decodeIfPresent(KeyboardShortcut.self, forKey: .resetWindowShortcut)
             focusWindowShortcut = try container.decodeIfPresent(KeyboardShortcut.self, forKey: .focusWindowShortcut)
+            showFocusedWindowBorder = try container.decodeIfPresent(Bool.self, forKey: .showFocusedWindowBorder) ?? false
+            focusedWindowBorderColor = try container.decodeIfPresent(String.self, forKey: .focusedWindowBorderColor) ?? "#FF6B00"
+            focusedWindowBorderWidth = try container.decodeIfPresent(Double.self, forKey: .focusedWindowBorderWidth) ?? 4.0
         }
         
         init(
@@ -34,7 +40,10 @@ struct AppConfiguration: Codable, Sendable {
             repositionOnDisplayChange: Bool,
             requireConfirmToLaunchApps: Bool,
             resetWindowShortcut: KeyboardShortcut? = nil,
-            focusWindowShortcut: KeyboardShortcut? = nil
+            focusWindowShortcut: KeyboardShortcut? = nil,
+            showFocusedWindowBorder: Bool = false,
+            focusedWindowBorderColor: String = "#FF6B00",
+            focusedWindowBorderWidth: Double = 4.0
         ) {
             self.enableAutoProfileSwitch = enableAutoProfileSwitch
             self.repositionOnAppLaunch = repositionOnAppLaunch
@@ -42,6 +51,9 @@ struct AppConfiguration: Codable, Sendable {
             self.requireConfirmToLaunchApps = requireConfirmToLaunchApps
             self.resetWindowShortcut = resetWindowShortcut
             self.focusWindowShortcut = focusWindowShortcut
+            self.showFocusedWindowBorder = showFocusedWindowBorder
+            self.focusedWindowBorderColor = focusedWindowBorderColor
+            self.focusedWindowBorderWidth = focusedWindowBorderWidth
         }
         
         static let `default` = GlobalSettings(

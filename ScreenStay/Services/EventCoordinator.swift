@@ -11,6 +11,7 @@ class EventCoordinator: ObservableObject {
     private let keyboardHandler = GlobalKeyboardHandler()
     private let windowEventMonitor: WindowEventMonitor
     private let focusRegionManager: FocusRegionManager
+    private let borderOverlay: FocusedWindowBorderOverlay
     
     init(
         profileManager: ProfileManager,
@@ -27,6 +28,9 @@ class EventCoordinator: ObservableObject {
         
         // Create focus region manager
         self.focusRegionManager = FocusRegionManager(accessibilityService: accessibilityService)
+        
+        // Create border overlay
+        self.borderOverlay = FocusedWindowBorderOverlay(accessibilityService: accessibilityService)
         
         // Initialize enforcer with monitor reference
         self.windowPositionEnforcer = windowPositionEnforcer
@@ -45,6 +49,14 @@ class EventCoordinator: ObservableObject {
         if let profile = await profileManager.autoSelectProfile() {
             await windowPositionEnforcer.enforceAllRegions(profile.regions)
         }
+        
+        // Start border overlay if enabled
+        let config = await profileManager.getConfiguration()
+        borderOverlay.start(
+            enabled: config.globalSettings.showFocusedWindowBorder,
+            color: config.globalSettings.focusedWindowBorderColor,
+            width: config.globalSettings.focusedWindowBorderWidth
+        )
         
         // Get all bundle IDs assigned to regions
         let bundleIDs = await getBundleIDsFromActiveRegions()
@@ -76,11 +88,22 @@ class EventCoordinator: ObservableObject {
     func stop() {
         keyboardHandler.stop()
         windowEventMonitor.stopMonitoring()
+        borderOverlay.stop()
         
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         NotificationCenter.default.removeObserver(self)
         
         print("🛑 Event listeners stopped")
+    }
+    
+    /// Update border overlay settings from configuration
+    func updateBorderSettings() async {
+        let config = await profileManager.getConfiguration()
+        borderOverlay.updateSettings(
+            enabled: config.globalSettings.showFocusedWindowBorder,
+            color: config.globalSettings.focusedWindowBorderColor,
+            width: config.globalSettings.focusedWindowBorderWidth
+        )
     }
     
     // MARK: - App Lifecycle Listeners
@@ -142,6 +165,11 @@ class EventCoordinator: ObservableObject {
             
             Task {
                 await self.handleAppActivation(app)
+                
+                // Update border overlay when focus changes
+                await MainActor.run {
+                    self.borderOverlay.updateBorder()
+                }
             }
         }
     }

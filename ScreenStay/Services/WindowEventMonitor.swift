@@ -7,12 +7,12 @@ import AppKit
 class WindowEventMonitor {
     
     private var observers: [pid_t: AXObserver] = [:]
-    private var monitoredBundleIDs: Set<String> = []
+    private var monitoredBundleIDs: Set<String> = [] // Apps assigned to regions (for window creation)
     private var positionedWindows: Set<CGWindowID> = []
     private var isRepositioning = false
     private let accessibilityService: AccessibilityService
     
-    var onWindowEvent: ((NSRunningApplication, AXUIElement) -> Void)?
+    var onWindowEvent: ((NSRunningApplication, AXUIElement, String) -> Void)?
     
     init(accessibilityService: AccessibilityService) {
         self.accessibilityService = accessibilityService
@@ -24,10 +24,10 @@ class WindowEventMonitor {
     func startMonitoring(bundleIDs: Set<String>) {
         monitoredBundleIDs = bundleIDs
         
-        // Monitor currently running apps
+        // Monitor ALL currently running apps (for focus changes and window creation)
         for app in NSWorkspace.shared.runningApplications {
-            if let bundleID = app.bundleIdentifier, monitoredBundleIDs.contains(bundleID) {
-                createObserver(for: app)
+            if let bundleID = app.bundleIdentifier, !bundleID.isEmpty {
+                createObserver(for: app, monitorCreation: monitoredBundleIDs.contains(bundleID))
             }
         }
     }
@@ -44,14 +44,15 @@ class WindowEventMonitor {
     
     /// Check if we should monitor this app
     func shouldMonitor(_ app: NSRunningApplication) -> Bool {
-        guard let bundleID = app.bundleIdentifier else { return false }
-        return monitoredBundleIDs.contains(bundleID)
+        // We monitor ALL apps now (for focus changes)
+        guard let bundleID = app.bundleIdentifier, !bundleID.isEmpty else { return false }
+        return true
     }
     
     /// Create observer for a newly launched app
     func observeApp(_ app: NSRunningApplication) async {
-        guard shouldMonitor(app) else { return }
-        createObserver(for: app)
+        guard shouldMonitor(app), let bundleID = app.bundleIdentifier else { return }
+        createObserver(for: app, monitorCreation: monitoredBundleIDs.contains(bundleID))
     }
     
     /// Remove observer when app terminates
@@ -108,7 +109,7 @@ class WindowEventMonitor {
     
     // MARK: - Private Implementation
     
-    private func createObserver(for app: NSRunningApplication) {
+    private func createObserver(for app: NSRunningApplication, monitorCreation: Bool) {
         let pid = app.processIdentifier
         
         // Don't create duplicate observers
@@ -152,9 +153,13 @@ class WindowEventMonitor {
             return
         }
         
-        // Only register for window creation events
-        // This catches: new windows (Cmd+N), app launches
-        AXObserverAddNotification(observer, appElement, kAXWindowCreatedNotification as CFString, contextPtr)
+        // Register for focus change events for ALL apps
+        AXObserverAddNotification(observer, appElement, kAXFocusedWindowChangedNotification as CFString, contextPtr)
+        
+        // Only register for window creation if app is assigned to a region
+        if monitorCreation {
+            AXObserverAddNotification(observer, appElement, kAXWindowCreatedNotification as CFString, contextPtr)
+        }
         
         // Add to run loop
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
@@ -163,24 +168,30 @@ class WindowEventMonitor {
     }
     
     private func handleWindowEvent(notification: String, element: AXUIElement, pid: pid_t) {
-        // Only handle window creation events
-        guard notification == kAXWindowCreatedNotification as String else {
+        // Find the app
+        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.processIdentifier == pid }) else {
             return
         }
         
-        // Ignore if we're currently repositioning
-        if isRepositioning {
-            return
+        // Handle window creation events
+        if notification == kAXWindowCreatedNotification as String {
+            // Ignore if we're currently repositioning
+            if isRepositioning {
+                return
+            }
+            
+            // Check if this window has already been positioned
+            if hasPositionedWindow(element) {
+                return
+            }
+            
+            // Trigger callback with window element and notification type
+            onWindowEvent?(app, element, notification)
         }
-        
-        // Check if this window has already been positioned
-        if hasPositionedWindow(element) {
-            return
-        }
-        
-        // Find the app and trigger callback with window element
-        if let app = NSWorkspace.shared.runningApplications.first(where: { $0.processIdentifier == pid }) {
-            onWindowEvent?(app, element)
+        // Handle focus change events - just update border
+        else if notification == kAXFocusedWindowChangedNotification as String {
+            // Trigger callback to update border only
+            onWindowEvent?(app, element, notification)
         }
     }
 }

@@ -63,9 +63,9 @@ class EventCoordinator: ObservableObject {
         
         // Start monitoring window events for these apps
         windowEventMonitor.startMonitoring(bundleIDs: bundleIDs)
-        windowEventMonitor.onWindowEvent = { [weak self] app, window in
+        windowEventMonitor.onWindowEvent = { [weak self] app, window, notification in
             Task { @MainActor in
-                await self?.handleWindowEvent(for: app, window: window)
+                await self?.handleWindowEvent(for: app, window: window, notification: notification)
             }
         }
         
@@ -241,7 +241,16 @@ class EventCoordinator: ObservableObject {
     
     // MARK: - Window Event Handling
     
-    private func handleWindowEvent(for app: NSRunningApplication, window: AXUIElement) async {
+    private func handleWindowEvent(for app: NSRunningApplication, window: AXUIElement, notification: String) async {
+        // Handle focus change events - just update border
+        if notification == kAXFocusedWindowChangedNotification as String {
+            await MainActor.run {
+                borderOverlay.updateBorder()
+            }
+            return
+        }
+        
+        // Handle window creation events - reposition and update border
         guard let bundleID = app.bundleIdentifier else { return }
         
         // Filter out system dialogs, sheets, and floating windows
@@ -266,6 +275,11 @@ class EventCoordinator: ObservableObject {
         // Reposition the window and mark it as positioned
         await windowPositionEnforcer.enforceRegion(region, for: app, window: window)
         windowEventMonitor.markWindowAsPositioned(window)
+        
+        // Update border overlay for the newly created window
+        await MainActor.run {
+            borderOverlay.updateBorder()
+        }
     }
     
     private func getBundleIDsFromActiveRegions() async -> Set<String> {

@@ -22,7 +22,7 @@ class AppSwitcherWindow: NSWindow {
     private func setupWindow() {
         isOpaque = false
         backgroundColor = NSColor.black.withAlphaComponent(0.85)
-        level = .floating
+        level = .popUpMenu  // Higher than .statusBar used by border overlay
         isMovableByWindowBackground = false
         hasShadow = true
         

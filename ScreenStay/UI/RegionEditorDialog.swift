@@ -436,7 +436,8 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
             frame: frame,
             assignedApps: appBundleIDs.filter { !$0.isEmpty },
             keyboardShortcut: shortcut,
-            padding: padding
+            padding: padding,
+            isFocusRegion: region?.isFocusRegion ?? false
         )
         
         onSave?(newRegion)

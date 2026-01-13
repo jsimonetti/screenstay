@@ -233,6 +233,8 @@ class FocusedWindowBorderOverlay {
         AXObserverAddNotification(observer, window, kAXMovedNotification as CFString, Unmanaged.passUnretained(self).toOpaque())
         AXObserverAddNotification(observer, window, kAXResizedNotification as CFString, Unmanaged.passUnretained(self).toOpaque())
         AXObserverAddNotification(observer, window, kAXUIElementDestroyedNotification as CFString, Unmanaged.passUnretained(self).toOpaque())
+        AXObserverAddNotification(observer, window, kAXWindowMiniaturizedNotification as CFString, Unmanaged.passUnretained(self).toOpaque())
+        AXObserverAddNotification(observer, window, kAXWindowDeminiaturizedNotification as CFString, Unmanaged.passUnretained(self).toOpaque())
         
         // Start observing
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
@@ -256,6 +258,12 @@ class FocusedWindowBorderOverlay {
             // Window was destroyed, hide border
             hideBorder()
             currentTrackedWindow = nil
+        } else if notificationName == kAXWindowMiniaturizedNotification as String {
+            // Window was minimized, hide border
+            hideBorder()
+        } else if notificationName == kAXWindowDeminiaturizedNotification as String {
+            // Window was unminimized, update border
+            updateBorder()
         } else if notificationName == kAXMovedNotification as String || notificationName == kAXResizedNotification as String {
             // Window moved or resized, update border position
             updateBorder()

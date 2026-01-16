@@ -170,7 +170,10 @@ class AccessibilityService {
                 kAXDialogSubrole as String,          // Standard dialogs (open/save)
                 kAXSystemDialogSubrole as String,    // System-level dialogs
                 kAXFloatingWindowSubrole as String,  // Floating palettes/inspectors
-                kAXSheetRole as String               // Modal sheets
+                kAXSheetRole as String,              // Modal sheets
+                "AXHelpTag",                         // Tooltips
+                "AXPopover",                         // Popover windows
+                "AXMenu"                             // Dropdown/context menus
             ]
             
             if excludedSubroles.contains(subrole) {

@@ -14,7 +14,6 @@ class FocusedWindowBorderOverlay {
     private var borderWidth: Double = 4.0
     
     // Cached values for performance
-    private var cachedGlobalMaxY: CGFloat = 0
     private var cachedScreenBounds: CGRect = .zero
     private var lastWindowScreen: NSScreen?
     
@@ -110,32 +109,29 @@ class FocusedWindowBorderOverlay {
     private func showBorder(around frame: CGRect) {
         let width = CGFloat(borderWidth)
         
-        // Find which screen contains this window (in Accessibility coordinates - top-left origin)
-        let windowCenterAX = CGPoint(x: frame.midX, y: frame.midY)
+        // Get the main screen (primary display) for coordinate conversion
+        guard let mainScreen = NSScreen.main else { return }
+        let mainScreenHeight = mainScreen.frame.height
+        
+        // Convert window frame from Accessibility coordinates (top-left origin) to NSScreen coordinates (bottom-left origin)
+        // In Accessibility API: (0,0) is top-left of main screen
+        // In NSScreen API: (0,0) is bottom-left of main screen
+        let convertedY = mainScreenHeight - frame.origin.y - frame.height
+        let convertedFrame = CGRect(x: frame.origin.x, y: convertedY, width: frame.width, height: frame.height)
+        
+        // Find which screen contains this window (now in NSScreen coordinates)
+        let windowCenter = CGPoint(x: convertedFrame.midX, y: convertedFrame.midY)
         
         // Try cached screen first for performance
         var targetScreen: NSScreen?
-        if let lastScreen = lastWindowScreen {
-            let screenFrame = lastScreen.frame
-            let axScreenY = cachedGlobalMaxY - screenFrame.maxY
-            let axScreenFrame = CGRect(x: screenFrame.minX, y: axScreenY, width: screenFrame.width, height: screenFrame.height)
-            
-            if axScreenFrame.contains(windowCenterAX) {
-                targetScreen = lastScreen
-            }
+        if let lastScreen = lastWindowScreen, lastScreen.frame.contains(windowCenter) {
+            targetScreen = lastScreen
         }
         
         // If not on cached screen, find the correct one
         if targetScreen == nil {
-            // Update cached global max Y
-            cachedGlobalMaxY = NSScreen.screens.map { $0.frame.maxY }.max() ?? 0
-            
             for screen in NSScreen.screens {
-                let screenFrame = screen.frame
-                let axScreenY = cachedGlobalMaxY - screenFrame.maxY
-                let axScreenFrame = CGRect(x: screenFrame.minX, y: axScreenY, width: screenFrame.width, height: screenFrame.height)
-                
-                if axScreenFrame.contains(windowCenterAX) {
+                if screen.frame.contains(windowCenter) {
                     targetScreen = screen
                     lastWindowScreen = screen
                     break
@@ -143,12 +139,7 @@ class FocusedWindowBorderOverlay {
             }
         }
         
-        guard let screen = targetScreen ?? NSScreen.main else { return }
-        
-        // Convert from Accessibility API coordinates to NSWindow coordinates
-        let convertedY = cachedGlobalMaxY - frame.origin.y - frame.height
-        let convertedFrame = CGRect(x: frame.origin.x, y: convertedY, width: frame.width, height: frame.height)
-        
+        let screen = targetScreen ?? mainScreen
         cachedScreenBounds = screen.frame
         
         // Create 4 border windows (top, right, bottom, left), clamped to screen bounds

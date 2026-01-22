@@ -173,7 +173,8 @@ class AccessibilityService {
                 kAXSheetRole as String,              // Modal sheets
                 "AXHelpTag",                         // Tooltips
                 "AXPopover",                         // Popover windows
-                "AXMenu"                             // Dropdown/context menus
+                "AXMenu",                            // Dropdown/context menus
+                "AXUnknown"                          // Unknown/unclassified windows
             ]
             
             if excludedSubroles.contains(subrole) {

@@ -23,14 +23,27 @@ extension LayoutEditorController {
         NSMenu.popUpContextMenu(menu, with: event, for: view)
     }
 
-    /// Regions containing a display-relative point, topmost first.
+    /// Regions containing a display-relative point, most specific first.
     ///
-    /// Array order is z-order with the last element on top, so the hit list is
-    /// the reverse of storage order.
+    /// Smallest area wins rather than topmost. Regions nest constantly - a
+    /// profile may hold several full-screen regions stacked over smaller ones -
+    /// and with plain topmost-first every click on the display lands on
+    /// whichever full-screen region happens to be last in the array, leaving
+    /// everything else unreachable. The smaller region is the more specific
+    /// target, and matches what you were pointing at.
+    ///
+    /// Equal areas fall back to array order, last first, so genuinely stacked
+    /// duplicates still resolve topmost first.
     func regions(under point: CGPoint, on display: DisplayRegistry.ResolvedDisplay) -> [Region] {
-        currentRegions
-            .filter { $0.displayKey == display.key && $0.relativeFrame.contains(point) }
-            .reversed()
+        currentRegions.enumerated()
+            .filter { $0.element.displayKey == display.key && $0.element.relativeFrame.contains(point) }
+            .sorted { lhs, rhs in
+                let lhsArea = lhs.element.relativeFrame.width * lhs.element.relativeFrame.height
+                let rhsArea = rhs.element.relativeFrame.width * rhs.element.relativeFrame.height
+                if lhsArea != rhsArea { return lhsArea < rhsArea }
+                return lhs.offset > rhs.offset
+            }
+            .map(\.element)
     }
 
     // MARK: - Menus

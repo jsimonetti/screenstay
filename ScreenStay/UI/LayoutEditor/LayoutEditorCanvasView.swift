@@ -57,21 +57,37 @@ final class LayoutEditorCanvasView: NSView {
         backdrop.setFill()
         bounds.fill()
 
-        // The selected region is drawn last so its highlight is never painted
-        // over by a region further along the array. Without this, selecting
-        // anything below a full-screen region looks like nothing happened.
-        for region in regions where region.id != selectedRegionID {
+        // Largest first, so a small region nested inside a big one stays
+        // visible instead of being painted over by it. This mirrors the hit
+        // test, where the smallest region under the pointer wins: what is drawn
+        // on top is what a click will reach.
+        for region in Self.paintOrder(regions) {
             draw(region, on: display)
         }
+
+        // Re-stroke the selection on top. Its own pass above may sit underneath
+        // a smaller region, and the highlight has to survive that.
         if let selectedRegionID,
            let selected = regions.first(where: { $0.id == selectedRegionID }) {
-            draw(selected, on: display)
+            strokeSelection(selected, on: display)
         }
 
         drawReservedBand(on: display)
         drawHandles(on: display)
         drawDisplayLabel(display)
         drawHint()
+    }
+
+    /// Back to front: biggest first, ties keeping array order.
+    static func paintOrder(_ regions: [Region]) -> [Region] {
+        regions.enumerated()
+            .sorted { lhs, rhs in
+                let lhsArea = lhs.element.relativeFrame.width * lhs.element.relativeFrame.height
+                let rhsArea = rhs.element.relativeFrame.width * rhs.element.relativeFrame.height
+                if lhsArea != rhsArea { return lhsArea > rhsArea }
+                return lhs.offset < rhs.offset
+            }
+            .map(\.element)
     }
 
     /// Where a display-relative region lands in this view's coordinates.
@@ -173,6 +189,16 @@ final class LayoutEditorCanvasView: NSView {
 
         drawText(assignmentSummary(for: region), at: NSPoint(x: rect.minX + 9, y: rect.minY + 8),
                  size: 10, weight: .regular, color: .white.withAlphaComponent(0.75))
+    }
+
+    private func strokeSelection(_ region: Region, on display: DisplayRegistry.ResolvedDisplay) {
+        let rect = Self.viewRect(for: region.relativeFrame, on: display)
+        guard rect.width > 2, rect.height > 2 else { return }
+
+        let path = NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 3, yRadius: 3)
+        selectedLine.setStroke()
+        path.lineWidth = 2.5
+        path.stroke()
     }
 
     /// The strip the menu bar occupies, which no window can be placed in.

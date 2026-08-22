@@ -81,7 +81,11 @@ The editor requires the profile's displays to be attached. It opens when `Profil
 
 ## Z-order
 
-Array order in `Profile.regions` is the z-order, last is topmost. It decides hit-test priority and paint order, except that the selected region is always painted last so its highlight cannot be covered by a region further along the array.
+Regions nest constantly, so neither hit testing nor painting follows array order.
+
+The smallest region under the pointer wins a click. Plain topmost-first makes everything unreachable the moment a full-screen region exists: in `Laptop only` every point on the display is inside all five regions, three of which are full-screen, so every click landed on the same one. The smaller region is the more specific target and is what you were pointing at. Equal areas fall back to array order, last first, so genuinely stacked duplicates still resolve topmost first.
+
+Painting is the inverse: largest first, so a small region nested inside a big one stays visible rather than being covered by it. What is drawn on top is what a click will reach. The selection outline is stroked again after everything else, since the selected region's own pass may sit underneath a smaller one.
 
 There is deliberately no way to reorder from the editor. `Bring to Front` and `Send to Back` existed briefly and were removed: `Select Region` already reaches a region buried under another, which was their only real use, and reordering is not as free as it looks. `EventCoordinator` picks a region for a launching app with `regions.first(where:)`, so if an app is ever assigned to two regions the array order silently decides which one wins. Exposing that as a cosmetic editor action invites changing runtime behaviour by accident. If duplicate assignments become a problem the answer is to warn about them, not to hand out z-order controls.
 

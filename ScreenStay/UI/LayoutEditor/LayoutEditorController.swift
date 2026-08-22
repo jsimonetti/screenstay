@@ -55,6 +55,11 @@ final class LayoutEditorController {
     /// Regions as they were when the current drag started, for a single undo step.
     private var dragSnapshot: [Region]?
 
+    /// Shortcuts claimed outside the profile's regions, supplied by the caller
+    /// so a clash can be pointed out. A region shortcut duplicating one of these
+    /// never fires: the global handler matches first and swallows it.
+    var globalShortcuts: [(shortcut: KeyboardShortcut, name: String)] = []
+
     /// Called with the edited regions when a session is saved.
     var onSave: ((_ profileID: String, _ regions: [Region]) -> Void)?
     /// Called when a session ends, saved or not, so the caller can restore its UI.

@@ -331,6 +331,15 @@ class ConfigurationWindow: NSWindowController {
         overlayManager.hideOverlays(saveChanges: false)
         toggleOverlayButton.title = "Show Overlay"
 
+        var globals: [(shortcut: KeyboardShortcut, name: String)] = []
+        if let reset = config?.globalSettings.resetWindowShortcut {
+            globals.append((reset, "Reset Window"))
+        }
+        if let focus = config?.globalSettings.focusWindowShortcut {
+            globals.append((focus, "Focus Window"))
+        }
+        layoutEditor.globalShortcuts = globals
+
         layoutEditor.onSave = { [weak self] profileID, regions in
             guard let self, let index = self.config?.profiles.firstIndex(where: { $0.id == profileID }) else { return }
             self.config?.profiles[index].regions = regions

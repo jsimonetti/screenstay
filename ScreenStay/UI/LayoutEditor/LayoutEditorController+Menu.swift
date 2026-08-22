@@ -107,17 +107,17 @@ extension LayoutEditorController {
 
         menu.addItem(menuItem("Rename\u{2026}") { [weak self] in self?.rename(region) })
 
-        // Assignment editing arrives with the inspector; the values are shown
-        // now so the menu still tells you what the region carries.
-        let apps = menuItem("Assign Apps\u{2026}   \(region.assignedApps.count)", enabled: false) {}
+        let appCount = region.assignedApps.count
+        menu.addItem(menuItem("Assign Apps\u{2026}   \(appCount == 1 ? "1 app" : "\(appCount) apps")") {
+            [weak self] in self?.editApps(of: region)
+        })
+
         let shortcutText = region.keyboardShortcut.map { shortcut in
             shortcut.modifiers.map(Self.symbol(for:)).joined() + shortcut.key.uppercased()
         } ?? "none"
-        let shortcut = menuItem("Assign Shortcut\u{2026}   \(shortcutText)", enabled: false) {}
-        apps.toolTip = "Use the Regions tab for now"
-        shortcut.toolTip = "Use the Regions tab for now"
-        menu.addItem(apps)
-        menu.addItem(shortcut)
+        menu.addItem(menuItem("Assign Shortcut\u{2026}   \(shortcutText)") {
+            [weak self] in self?.editShortcut(of: region)
+        })
 
         let focus = menuItem("Focus Region") { [weak self] in self?.toggleFocus(region) }
         focus.state = region.isFocusRegion ? .on : .off
@@ -222,6 +222,49 @@ extension LayoutEditorController {
                 regions[other].isFocusRegion = false
             }
             regions[index].isFocusRegion = becomingFocus
+        }
+    }
+
+    private func editApps(of region: Region) {
+        guard let updated = runModal({ LayoutEditorAssignmentSheets.editApps(for: region) }),
+              updated != region.assignedApps else {
+            return
+        }
+
+        mutate("changed the apps in \(region.name)") { regions in
+            guard let index = regions.firstIndex(where: { $0.id == region.id }) else { return }
+            regions[index].assignedApps = updated
+        }
+    }
+
+    private func editShortcut(of region: Region) {
+        // Everything already spoken for, so a clash can be pointed out. The two
+        // global shortcuts count as well: a region shortcut that duplicates one
+        // of them is swallowed before it ever reaches the region.
+        var taken: [(shortcut: KeyboardShortcut, owner: String)] = currentRegions
+            .filter { $0.id != region.id }
+            .compactMap { other in
+                other.keyboardShortcut.map { ($0, "region \u{201C}\(other.name)\u{201D}") }
+            }
+        for (shortcut, name) in globalShortcuts {
+            taken.append((shortcut, name))
+        }
+
+        guard let choice = runModal({
+            LayoutEditorAssignmentSheets.editShortcut(for: region, taken: taken)
+        }) else {
+            return
+        }
+
+        let updated = choice
+        guard updated?.key != region.keyboardShortcut?.key
+                || updated?.modifiers != region.keyboardShortcut?.modifiers else {
+            return
+        }
+
+        mutate("changed the shortcut for \(region.name)") { regions in
+            guard let index = regions.firstIndex(where: { $0.id == region.id }) else { return }
+            regions[index].keyboardShortcut = updated
         }
     }
 

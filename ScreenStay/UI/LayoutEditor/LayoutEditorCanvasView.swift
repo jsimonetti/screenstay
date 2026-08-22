@@ -16,8 +16,23 @@ final class LayoutEditorCanvasView: NSView {
     var onContextMenu: ((_ relativePoint: CGPoint, _ display: DisplayRegistry.ResolvedDisplay,
                          _ event: NSEvent, _ view: LayoutEditorCanvasView) -> Void)?
 
+    /// Pointer press, drag and release, in display-relative AX coordinates.
+    var onMouseDown: ((CGPoint, DisplayRegistry.ResolvedDisplay) -> Void)?
+    var onMouseDragged: ((CGPoint, DisplayRegistry.ResolvedDisplay) -> Void)?
+    var onMouseUp: ((CGPoint, DisplayRegistry.ResolvedDisplay) -> Void)?
+
     /// Regions belonging to this display, in z-order, bottom first.
     var regions: [Region] = [] {
+        didSet { needsDisplay = true }
+    }
+
+    /// The region the context menu and the handles act on.
+    var selectedRegionID: String? {
+        didSet { needsDisplay = true }
+    }
+
+    /// Handles for the selected region only, so the display stays readable.
+    var handles: [LayoutEditorOperations.Handle] = [] {
         didSet { needsDisplay = true }
     }
 
@@ -29,6 +44,9 @@ final class LayoutEditorCanvasView: NSView {
     private let regionLine = NSColor.white.withAlphaComponent(0.85)
     private let regionFill = NSColor.white.withAlphaComponent(0.06)
     private let focusLine = NSColor(calibratedRed: 1.0, green: 0.62, blue: 0.24, alpha: 1.0)
+    private let selectedLine = NSColor(calibratedRed: 0.42, green: 0.68, blue: 1.0, alpha: 1.0)
+    private let handleFill = NSColor.white
+    private let loneHandleFill = NSColor.white.withAlphaComponent(0.45)
 
     // MARK: - Drawing
 
@@ -43,6 +61,7 @@ final class LayoutEditorCanvasView: NSView {
             draw(region, on: display)
         }
 
+        drawHandles(on: display)
         drawDisplayLabel(display)
         drawHint()
     }
@@ -90,7 +109,22 @@ final class LayoutEditorCanvasView: NSView {
             rightMouseDown(with: event)
             return
         }
-        super.mouseDown(with: event)
+        forward(event, to: onMouseDown)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        forward(event, to: onMouseDragged)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        forward(event, to: onMouseUp)
+    }
+
+    private func forward(_ event: NSEvent,
+                         to handler: ((CGPoint, DisplayRegistry.ResolvedDisplay) -> Void)?) {
+        guard let display, let handler else { return }
+        let viewPoint = convert(event.locationInWindow, from: nil)
+        handler(Self.relativePoint(forViewPoint: viewPoint, on: display), display)
     }
 
     private func draw(_ region: Region, on display: DisplayRegistry.ResolvedDisplay) {
@@ -98,15 +132,27 @@ final class LayoutEditorCanvasView: NSView {
         guard rect.width > 2, rect.height > 2 else { return }
 
         let isFocus = region.isFocusRegion
-        let line = isFocus ? focusLine : regionLine
-        let path = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 3, yRadius: 3)
+        let isSelected = region.id == selectedRegionID
+        let path = NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 3, yRadius: 3)
 
-        (isFocus ? focusLine.withAlphaComponent(0.10) : regionFill).setFill()
+        // Selection wins over the focus styling, so there is never any doubt
+        // about which region an action will apply to.
+        let line = isSelected ? selectedLine : (isFocus ? focusLine : regionLine)
+        let fill: NSColor
+        if isSelected {
+            fill = selectedLine.withAlphaComponent(0.16)
+        } else if isFocus {
+            fill = focusLine.withAlphaComponent(0.10)
+        } else {
+            fill = regionFill
+        }
+
+        fill.setFill()
         path.fill()
 
         line.setStroke()
-        path.lineWidth = isFocus ? 1.5 : 1
-        if isFocus {
+        path.lineWidth = isSelected ? 2.5 : (isFocus ? 1.5 : 1)
+        if isFocus && !isSelected {
             path.setLineDash([6, 4], count: 2, phase: 0)
         }
         path.stroke()
@@ -119,6 +165,23 @@ final class LayoutEditorCanvasView: NSView {
 
         drawText(assignmentSummary(for: region), at: NSPoint(x: rect.minX + 9, y: rect.minY + 8),
                  size: 10, weight: .regular, color: .white.withAlphaComponent(0.75))
+    }
+
+    /// Solid pills mark a boundary shared with another region, where dragging
+    /// moves both. Dimmer ones are edges with no neighbour, moving one region.
+    private func drawHandles(on display: DisplayRegistry.ResolvedDisplay) {
+        for handle in handles {
+            let rect = Self.viewRect(for: handle.rect, on: display)
+            (handle.isLinked ? handleFill : loneHandleFill).setFill()
+
+            let radius = min(rect.width, rect.height) / 2
+            let pill = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+
+            NSColor.black.withAlphaComponent(0.45).setStroke()
+            pill.lineWidth = 1
+            pill.fill()
+            pill.stroke()
+        }
     }
 
     /// What this region carries besides its rectangle, so nothing is deleted blind.

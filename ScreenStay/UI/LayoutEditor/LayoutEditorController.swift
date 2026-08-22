@@ -36,12 +36,21 @@ final class LayoutEditorController {
     }
 
     private var session: Session?
-    private var overlays: [LayoutEditorOverlayWindow] = []
+    /// One per display in the profile. Read by the drag and menu extensions.
+    private(set) var overlays: [LayoutEditorOverlayWindow] = []
     private var localKeyMonitor: Any?
     private var globalKeyMonitor: Any?
     private var displayChangeObserver: NSObjectProtocol?
     private var undoStack: [[Region]] = []
     private var redoStack: [[Region]] = []
+    private var savedPresentationOptions: NSApplication.PresentationOptions?
+
+    /// Region the pointer and the context menu act on.
+    var selectedRegionID: String?
+    /// What the pointer is doing, if anything.
+    var activeDrag: Drag?
+    /// Regions as they were when the current drag started, for a single undo step.
+    private var dragSnapshot: [Region]?
 
     /// Called with the edited regions when a session is saved.
     var onSave: ((_ profileID: String, _ regions: [Region]) -> Void)?
@@ -90,6 +99,12 @@ final class LayoutEditorController {
         startKeyMonitor()
         startDisplayChangeObserver()
 
+        // Level alone does not get past the menu bar; the editor has to ask for
+        // it to be hidden. Restored in close(), and the system restores it
+        // anyway as soon as another app becomes active.
+        savedPresentationOptions = NSApp.presentationOptions
+        NSApp.presentationOptions = [.hideDock, .hideMenuBar]
+
         NSApp.activate(ignoringOtherApps: true)
         log("Layout editor opened for '\(bound.name)' across \(overlays.count) display(s)")
         return nil
@@ -103,6 +118,15 @@ final class LayoutEditorController {
             overlay.canvas.regions = profile.regions.filter { $0.displayKey == display.key }
             overlay.canvas.onContextMenu = { [weak self] point, display, event, view in
                 self?.showContextMenu(atRelative: point, on: display, event: event, in: view)
+            }
+            overlay.canvas.onMouseDown = { [weak self] point, display in
+                self?.handleMouseDown(atRelative: point, on: display)
+            }
+            overlay.canvas.onMouseDragged = { [weak self] point, display in
+                self?.handleMouseDragged(atRelative: point, on: display)
+            }
+            overlay.canvas.onMouseUp = { [weak self] point, display in
+                self?.handleMouseUp(atRelative: point, on: display)
             }
             overlay.orderFrontRegardless()
             overlays.append(overlay)
@@ -137,7 +161,32 @@ final class LayoutEditorController {
         redoStack.removeAll()
         self.session = session
         refreshCanvases()
+        refreshHandles()
         log("Layout editor: \(description)")
+    }
+
+    /// Apply an edit without touching the undo stack, for the frames of a drag.
+    func updateLive(_ body: (inout [Region]) -> Void) {
+        guard var session else { return }
+        body(&session.regions)
+        self.session = session
+        refreshCanvases()
+    }
+
+    func beginDrag(_ drag: Drag) {
+        activeDrag = drag
+        dragSnapshot = currentRegions
+    }
+
+    /// Finish a drag, recording the whole gesture as one undo step.
+    func endDrag() {
+        defer {
+            activeDrag = nil
+            dragSnapshot = nil
+        }
+        guard let dragSnapshot, dragSnapshot != currentRegions else { return }
+        undoStack.append(dragSnapshot)
+        redoStack.removeAll()
     }
 
     func undo() {
@@ -146,6 +195,7 @@ final class LayoutEditorController {
         session.regions = previous
         self.session = session
         refreshCanvases()
+        refreshHandles()
         log("Layout editor: undo")
     }
 
@@ -155,6 +205,7 @@ final class LayoutEditorController {
         session.regions = next
         self.session = session
         refreshCanvases()
+        refreshHandles()
         log("Layout editor: redo")
     }
 
@@ -210,6 +261,14 @@ final class LayoutEditorController {
         } else {
             log("Layout editor closed '\(session.profileName)' without saving")
         }
+
+        if let savedPresentationOptions {
+            NSApp.presentationOptions = savedPresentationOptions
+        }
+        savedPresentationOptions = nil
+        selectedRegionID = nil
+        activeDrag = nil
+        dragSnapshot = nil
 
         stopKeyMonitor()
         stopDisplayChangeObserver()

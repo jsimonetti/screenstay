@@ -200,3 +200,163 @@ enum LayoutEditorOperations {
         return CGRect(x: x, y: y, width: width, height: height)
     }
 }
+
+// MARK: - Handles
+
+extension LayoutEditorOperations {
+
+    /// A draggable edge of a region.
+    ///
+    /// Handles are derived, not stored. When another region's opposite edge sits
+    /// at exactly the same coordinate the two are treated as one boundary and
+    /// dragging moves both, which is what gives a tiled layout divider
+    /// behaviour without the model being a partition.
+    struct Handle {
+        let edge: Edge
+        let regionID: String
+        /// Regions whose opposite edge coincides with this one.
+        let linkedRegionIDs: [String]
+        /// Pill in display-relative coordinates, for drawing and hit testing.
+        let rect: CGRect
+
+        var isLinked: Bool { !linkedRegionIDs.isEmpty }
+        var isHorizontalEdge: Bool { edge == .top || edge == .bottom }
+    }
+
+    /// Long side of a handle pill.
+    static let handleLength: CGFloat = 34
+    /// Short side of a handle pill.
+    static let handleThickness: CGFloat = 6
+    /// How far from a pill still counts as grabbing it.
+    static let handleGrabSlop: CGFloat = 6
+
+    /// The four handles of a region, with any coincident neighbours recorded.
+    static func handles(for region: Region, among all: [Region]) -> [Handle] {
+        let frame = region.relativeFrame
+        let neighbours = all.filter { $0.id != region.id && $0.displayKey == region.displayKey }
+
+        return Edge.allCases.map { edge in
+            let position = coordinate(of: edge, in: frame)
+
+            // A divider is this edge meeting a neighbour's *opposite* edge.
+            // Two regions merely aligned on the same side are not a boundary.
+            let linked = neighbours.filter { neighbour in
+                abs(coordinate(of: edge.opposite, in: neighbour.relativeFrame) - position) < 0.5
+                    && overlaps(frame, neighbour.relativeFrame, alongEdge: edge)
+            }.map(\.id)
+
+            return Handle(edge: edge, regionID: region.id, linkedRegionIDs: linked,
+                          rect: handleRect(for: edge, in: frame))
+        }
+    }
+
+    static func handleRect(for edge: Edge, in frame: CGRect) -> CGRect {
+        switch edge {
+        case .left, .right:
+            let x = edge == .left ? frame.minX : frame.maxX
+            return CGRect(x: x - handleThickness / 2, y: frame.midY - handleLength / 2,
+                          width: handleThickness, height: handleLength)
+        case .top, .bottom:
+            let y = edge == .top ? frame.minY : frame.maxY
+            return CGRect(x: frame.midX - handleLength / 2, y: y - handleThickness / 2,
+                          width: handleLength, height: handleThickness)
+        }
+    }
+
+    /// Move a handle's edge, carrying any linked neighbours with it.
+    static func resize(
+        _ regions: [Region],
+        handle: Handle,
+        toRelative value: CGFloat,
+        on display: DisplayRegistry.ResolvedDisplay
+    ) -> [Region] {
+        guard let index = regions.firstIndex(where: { $0.id == handle.regionID }) else { return regions }
+
+        let bounds = CGRect(origin: .zero, size: display.axBounds.size)
+        let frame = regions[index].relativeFrame
+
+        // Keep the dragged region a usable size and inside its display.
+        let clamped: CGFloat
+        switch handle.edge {
+        case .left:   clamped = min(max(value, bounds.minX), frame.maxX - minimumRegionEdge)
+        case .right:  clamped = max(min(value, bounds.maxX), frame.minX + minimumRegionEdge)
+        case .top:    clamped = min(max(value, bounds.minY), frame.maxY - minimumRegionEdge)
+        case .bottom: clamped = max(min(value, bounds.maxY), frame.minY + minimumRegionEdge)
+        }
+
+        var result = regions
+        result[index].relativeFrame = apply(handle.edge, at: clamped, to: frame)
+
+        // Linked neighbours follow, so a shared boundary stays shared.
+        for linkedID in handle.linkedRegionIDs {
+            guard let other = result.firstIndex(where: { $0.id == linkedID }) else { continue }
+            let otherFrame = result[other].relativeFrame
+            let moved = apply(handle.edge.opposite, at: clamped, to: otherFrame)
+            // Refuse to crush the neighbour; leave it be rather than invert it.
+            if moved.width >= minimumRegionEdge && moved.height >= minimumRegionEdge {
+                result[other].relativeFrame = moved
+            }
+        }
+        return result
+    }
+
+    /// Translate a region, keeping it inside its display.
+    static func move(
+        _ region: Region,
+        toRelativeOrigin origin: CGPoint,
+        on display: DisplayRegistry.ResolvedDisplay
+    ) -> Region {
+        let bounds = CGRect(origin: .zero, size: display.axBounds.size)
+        let frame = region.relativeFrame
+        var moved = region
+        moved.relativeFrame = CGRect(
+            x: min(max(origin.x, 0), max(0, bounds.width - frame.width)),
+            y: min(max(origin.y, 0), max(0, bounds.height - frame.height)),
+            width: frame.width,
+            height: frame.height
+        )
+        return moved
+    }
+
+    // MARK: - Edge helpers
+
+    static func coordinate(of edge: Edge, in frame: CGRect) -> CGFloat {
+        switch edge {
+        case .left: return frame.minX
+        case .right: return frame.maxX
+        case .top: return frame.minY
+        case .bottom: return frame.maxY
+        }
+    }
+
+    private static func apply(_ edge: Edge, at value: CGFloat, to frame: CGRect) -> CGRect {
+        switch edge {
+        case .left:   return CGRect(x: value, y: frame.minY, width: frame.maxX - value, height: frame.height)
+        case .right:  return CGRect(x: frame.minX, y: frame.minY, width: value - frame.minX, height: frame.height)
+        case .top:    return CGRect(x: frame.minX, y: value, width: frame.width, height: frame.maxY - value)
+        case .bottom: return CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: value - frame.minY)
+        }
+    }
+
+    /// Whether two regions actually run alongside each other at a shared edge,
+    /// rather than merely having the same coordinate somewhere far away.
+    private static func overlaps(_ a: CGRect, _ b: CGRect, alongEdge edge: Edge) -> Bool {
+        switch edge {
+        case .left, .right:
+            return min(a.maxY, b.maxY) - max(a.minY, b.minY) > 0
+        case .top, .bottom:
+            return min(a.maxX, b.maxX) - max(a.minX, b.minX) > 0
+        }
+    }
+}
+
+extension LayoutEditorOperations.Edge: CaseIterable {
+    var opposite: LayoutEditorOperations.Edge {
+        switch self {
+        case .left: return .right
+        case .right: return .left
+        case .top: return .bottom
+        case .bottom: return .top
+        }
+    }
+}

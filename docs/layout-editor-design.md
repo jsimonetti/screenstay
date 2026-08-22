@@ -3,7 +3,11 @@
 Status: agreed, not yet implemented.
 Branch: `feature/layout-editor`.
 
-A full screen editor for arranging a profile's regions directly on the displays they apply to, replacing the `RegionEditorDialog` form and the `RegionOverlay` drag surface once it is complete. Both of those stay in place and untouched during development.
+A full screen editor for arranging a profile's regions directly on the displays they apply to.
+
+The `RegionEditorDialog` form on the Regions tab stays. It was meant to be retired once the editor was complete, and functionally it now is, but the two are not interchangeable: the form edits `profile.displayTopology`, the topology as stored, so it works for any profile whatever is plugged in, while the editor deliberately refuses when the profile's displays are absent. Removing the form would leave a profile uneditable away from its hardware. The editor is the primary way to arrange a layout; the form is the fallback for a profile you cannot currently see.
+
+Giving the editor a scaled schematic mode for absent displays would make the form genuinely redundant. Until then it is not.
 
 ## Why not a divider model
 
@@ -120,6 +124,12 @@ Every region shows a badge with what it carries, for example `4 apps, Ctrl Cmd C
 The new gap is whichever padding value the configuration used most often, so the common case keeps the spacing it had, falling back to `3` when there is nothing to infer from.
 
 Six regions change by a few points as a result. The three focus regions and the three `MacBook - Fullscreen` regions that had `0` gain a 3 point inset, except Ultrawide's `MacBook - Fullscreen`, which had `5` and loses 2.
+
+## Testing
+
+Region geometry, matching, migration and the editor's own operations are pure functions and are covered by harnesses under the session scratch directory.
+
+Anything touching the Accessibility API is not, unless it runs from `make test-ax`. A plain command line binary is never a trusted Accessibility client, so AX calls from one return nothing and a test written against them passes or fails for reasons that have nothing to do with the code. `Tests/AXHarness` is built and signed as an app bundle with a stable identifier so the permission can be granted once and kept.
 
 ## Out of scope for the first version
 

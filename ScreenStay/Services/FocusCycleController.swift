@@ -13,11 +13,17 @@ actor FocusCycleController {
     @MainActor
     private var switcherState: SwitcherState?
     @MainActor
-    private var eventMonitor: Any?
-    @MainActor
-    private var localEventMonitor: Any?
-    @MainActor
     private var switcherTimeout: Task<Void, Never>?
+
+    /// The event tap, which already watches modifiers for the whole system.
+    /// Weak: the coordinator owns it.
+    @MainActor
+    private weak var keyboardHandler: GlobalKeyboardHandler?
+
+    @MainActor
+    func setKeyboardHandler(_ handler: GlobalKeyboardHandler) {
+        keyboardHandler = handler
+    }
     @MainActor
     private var switcherWindow: AppSwitcherWindow?
     
@@ -149,42 +155,30 @@ actor FocusCycleController {
         switcherWindow?.updateApps(state.apps, selectedIndex: state.selectedIndex)
     }
     
-    /// Start monitoring for modifier key release
+    /// Wait for the modifiers to come back up.
     ///
-    /// Two monitors, not one. A global monitor only sees events dispatched to
-    /// *other* applications, so as soon as ScreenStay itself is active - which
-    /// it is whenever the Settings window is open - the modifier release never
-    /// arrives and the switcher hangs with no way to commit or dismiss it.
+    /// This used to install its own NSEvent monitors. A global monitor cannot
+    /// see events delivered to ScreenStay, so with the Settings window open the
+    /// release never arrived and the switcher hung; a local monitor beside it
+    /// covered that case without addressing why. The event tap sees modifier
+    /// changes system-wide whatever is frontmost, so there is one watcher now
+    /// instead of three, and it is only armed while the switcher is up.
     @MainActor
     private func startModifierMonitoring() async {
         stopModifierMonitoring()
 
-        let onFlagsChanged: @MainActor (NSEvent) -> Void = { [weak self] event in
+        keyboardHandler?.beginWatchingModifierRelease { [weak self] in
             guard let self else { return }
-            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            let held = modifiers.contains(.command) || modifiers.contains(.control)
-                || modifiers.contains(.option) || modifiers.contains(.shift)
-            if !held {
-                Task { await self.commitSelection() }
-            }
-        }
-
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { event in
-            Task { @MainActor in onFlagsChanged(event) }
-        }
-
-        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
-            MainActor.assumeIsolated { onFlagsChanged(event) }
-            return event
+            Task { await self.commitSelection() }
         }
 
         startSwitcherTimeout()
     }
 
-    /// Commit anyway if the modifiers are never seen going up.
+    /// Commit anyway if the release is never seen.
     ///
-    /// A quick enough tap releases them before the monitors are installed, and
-    /// nothing would arrive to close the switcher.
+    /// A quick enough tap lets the modifiers go before the watcher is armed,
+    /// and nothing would arrive to close the switcher.
     @MainActor
     private func startSwitcherTimeout() {
         switcherTimeout?.cancel()
@@ -192,8 +186,7 @@ actor FocusCycleController {
             try? await Task.sleep(for: .seconds(Self.switcherTimeout))
             guard !Task.isCancelled, self.switcherState != nil else { return }
 
-            // If the modifiers really are still down the user is still choosing,
-            // so only give up when nothing is held.
+            // Still holding means still choosing, so wait again.
             let held = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
             let stillHolding = held.contains(.command) || held.contains(.control)
                 || held.contains(.option) || held.contains(.shift)
@@ -209,14 +202,7 @@ actor FocusCycleController {
 
     @MainActor
     private func stopModifierMonitoring() {
-        if let eventMonitor {
-            NSEvent.removeMonitor(eventMonitor)
-        }
-        if let localEventMonitor {
-            NSEvent.removeMonitor(localEventMonitor)
-        }
-        eventMonitor = nil
-        localEventMonitor = nil
+        keyboardHandler?.endWatchingModifierRelease()
         switcherTimeout?.cancel()
         switcherTimeout = nil
     }

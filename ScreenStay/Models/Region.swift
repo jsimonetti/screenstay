@@ -101,14 +101,4 @@ struct Region: Codable, Identifiable, Sendable, Equatable {
 struct KeyboardShortcut: Codable, Sendable, Equatable {
     var modifiers: [String] // ["cmd", "shift", "option", "control"]
     var key: String // Single character or special key name
-
-    /// Convert to Carbon key code equivalent flags
-    var carbonFlags: Int {
-        var flags = 0
-        if modifiers.contains("cmd") { flags |= 0x0100 /* cmdKey */ }
-        if modifiers.contains("shift") { flags |= 0x0200 /* shiftKey */ }
-        if modifiers.contains("option") { flags |= 0x0800 /* optionKey */ }
-        if modifiers.contains("control") { flags |= 0x1000 /* controlKey */ }
-        return flags
-    }
 }

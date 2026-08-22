@@ -25,10 +25,23 @@ final class GlobalKeyboardHandler: @unchecked Sendable {
     private var shortcuts: [KeyboardShortcut] = []
     private var onShortcutTriggered: (@MainActor @Sendable (KeyboardShortcut) -> Void)?
 
+    /// Called once every modifier key has been let go.
+    ///
+    /// Registered only while something is waiting for it, so the tap does not
+    /// schedule work on every modifier release the machine sees.
+    private var onModifiersReleased: (@MainActor @Sendable () -> Void)?
+
     // MARK: - Lifecycle
 
+    /// Returns false if the tap could not be created.
+    ///
+    /// Presenting the failure is the caller's business. This runs on every
+    /// configuration save, and a modal raised from here meant an alert every
+    /// time you pressed Save while the permission was missing.
     @MainActor
-    func start(shortcuts: [KeyboardShortcut], onShortcutTriggered: @escaping @MainActor @Sendable (KeyboardShortcut) -> Void) {
+    @discardableResult
+    func start(shortcuts: [KeyboardShortcut],
+               onShortcutTriggered: @escaping @MainActor @Sendable (KeyboardShortcut) -> Void) -> Bool {
         log("🎹 Starting keyboard handler with \(shortcuts.count) shortcuts")
         for shortcut in shortcuts {
             var notes: [String] = []
@@ -83,8 +96,7 @@ final class GlobalKeyboardHandler: @unchecked Sendable {
 
         guard let tap else {
             log("❌ Could not create the keyboard event tap")
-            showPermissionAlert()
-            return
+            return false
         }
 
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
@@ -97,6 +109,31 @@ final class GlobalKeyboardHandler: @unchecked Sendable {
         lock.unlock()
 
         log("✅ Keyboard handler listening (tap enabled: \(CGEvent.tapIsEnabled(tap: tap)))")
+        return true
+    }
+
+    // MARK: - Modifier release
+
+    /// Ask to be told when every modifier is released.
+    ///
+    /// The tap already sees modifier changes for the whole system, whichever
+    /// app is active. Watching them here replaces the pair of NSEvent monitors
+    /// the switcher used to install: a global monitor cannot see events sent to
+    /// ScreenStay itself, so the switcher hung whenever the app was frontmost,
+    /// and adding a local monitor beside it papered over that rather than
+    /// fixing it.
+    @MainActor
+    func beginWatchingModifierRelease(_ handler: @escaping @MainActor @Sendable () -> Void) {
+        lock.lock()
+        onModifiersReleased = handler
+        lock.unlock()
+    }
+
+    @MainActor
+    func endWatchingModifierRelease() {
+        lock.lock()
+        onModifiersReleased = nil
+        lock.unlock()
     }
 
     @MainActor
@@ -107,6 +144,7 @@ final class GlobalKeyboardHandler: @unchecked Sendable {
         eventTap = nil
         runLoopSource = nil
         onShortcutTriggered = nil
+        onModifiersReleased = nil
         lock.unlock()
 
         guard let tap else { return }
@@ -138,6 +176,20 @@ final class GlobalKeyboardHandler: @unchecked Sendable {
             lock.unlock()
             if let tap {
                 CGEvent.tapEnable(tap: tap, enable: true)
+            }
+            return Unmanaged.passUnretained(event)
+        }
+
+        if type == .flagsChanged {
+            // Never consumed: other apps need their own modifier handling.
+            guard event.flags.intersection(Self.significantModifiers).isEmpty else {
+                return Unmanaged.passUnretained(event)
+            }
+            lock.lock()
+            let released = onModifiersReleased
+            lock.unlock()
+            if let released {
+                Task { @MainActor in released() }
             }
             return Unmanaged.passUnretained(event)
         }
@@ -208,8 +260,10 @@ final class GlobalKeyboardHandler: @unchecked Sendable {
 
     // MARK: - Failure reporting
 
+    /// Explain that shortcuts are unavailable. Called by the coordinator, at
+    /// most once per session.
     @MainActor
-    private func showPermissionAlert() {
+    static func showPermissionAlert() {
         let alert = NSAlert()
         alert.messageText = "Keyboard Shortcuts Unavailable"
         alert.informativeText = """

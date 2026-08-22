@@ -39,6 +39,11 @@ class EventCoordinator: ObservableObject {
         Task {
             await windowPositionEnforcer.setWindowEventMonitor(windowEventMonitor)
         }
+
+        // The switcher waits on modifier releases seen by the tap.
+        Task { @MainActor in
+            focusCycleController.setKeyboardHandler(keyboardHandler)
+        }
     }
     
     /// Start listening to system events
@@ -324,7 +329,7 @@ class EventCoordinator: ObservableObject {
     private func setupKeyboardShortcuts() async {
         let shortcuts = await collectShortcuts()
 
-        keyboardHandler.start(shortcuts: shortcuts) { [weak self] shortcut in
+        let started = keyboardHandler.start(shortcuts: shortcuts) { [weak self] shortcut in
             guard let self = self else { return }
             
             Task {
@@ -352,7 +357,17 @@ class EventCoordinator: ObservableObject {
                 }
             }
         }
+
+        // Report the failure once. setupKeyboardShortcuts runs on every save,
+        // and alerting from inside start() meant an alert on every one.
+        if !started && !hasReportedKeyboardFailure {
+            hasReportedKeyboardFailure = true
+            GlobalKeyboardHandler.showPermissionAlert()
+        }
     }
+
+    /// Whether the keyboard tap failure has already been shown this session.
+    private var hasReportedKeyboardFailure = false
     
     /// Swap in a new shortcut list without disturbing the event tap.
     ///

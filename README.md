@@ -164,6 +164,34 @@ make -f Makefile.local install
 wrong identifier, because macOS would treat it as a different app from the one
 already in your Accessibility list.
 
+## Testing
+
+Most logic is pure and can be exercised directly. Anything that calls the
+Accessibility API cannot: a plain command line binary is never a trusted
+Accessibility client, so those calls return nothing and the tests would be
+meaningless.
+
+The Accessibility harness is therefore built and signed as an app bundle:
+
+```bash
+make test-ax
+```
+
+The first run reports that the bundle is not trusted and prints its path. Add
+that bundle in System Settings, Privacy & Security, Accessibility, then run it
+again. The harness only reads system state; it never moves or resizes windows.
+
+Sign it with the same certificate as the app to keep the grant across rebuilds,
+the same way `Makefile.local` handles the app itself:
+
+```makefile
+test-ax:
+	@$(MAKE) -f Makefile test-ax SIGNING_IDENTITY=$(SIGNING_IDENTITY)
+```
+
+Without that it is ad-hoc signed and the permission has to be granted again
+after every rebuild.
+
 ## Configuration
 
 Configuration is stored in JSON format at:

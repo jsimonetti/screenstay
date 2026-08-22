@@ -74,6 +74,7 @@ class KeyboardShortcutRecorder: NSView {
     
     private func startRecording() {
         isRecording = true
+        rejectionReason = nil
         textField.stringValue = "Type shortcut..."
         layer?.borderColor = NSColor.controlAccentColor.cgColor
         layer?.borderWidth = 2
@@ -148,6 +149,16 @@ class KeyboardShortcutRecorder: NSView {
     }
     
     private func updateDisplay() {
+        // A refused key press keeps recording, so say why rather than only
+        // beeping and appearing to have ignored the press.
+        if let rejectionReason {
+            textField.stringValue = rejectionReason
+            textField.textColor = .systemOrange
+            clearButton.isHidden = currentModifiers.isEmpty || currentKey.isEmpty
+            return
+        }
+        textField.textColor = .labelColor
+
         if currentModifiers.isEmpty || currentKey.isEmpty {
             textField.stringValue = "Click to record"
             clearButton.isHidden = true

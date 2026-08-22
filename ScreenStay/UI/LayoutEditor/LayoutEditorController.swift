@@ -44,6 +44,9 @@ final class LayoutEditorController {
     private var undoStack: [[Region]] = []
     private var redoStack: [[Region]] = []
     private var savedPresentationOptions: NSApplication.PresentationOptions?
+    /// Display bounds the session opened against, to tell a real reconfiguration
+    /// from a notification about something else.
+    private var openingDisplayBounds: [String: CGRect] = [:]
 
     /// Region the pointer and the context menu act on.
     var selectedRegionID: String?
@@ -97,16 +100,28 @@ final class LayoutEditorController {
 
         presentOverlays(for: bound)
         startKeyMonitor()
-        startDisplayChangeObserver()
 
-        // Level alone does not get past the menu bar; the editor has to ask for
-        // it to be hidden. Restored in close(), and the system restores it
-        // anyway as soon as another app becomes active.
+        // Activate first. Presentation options are only applied while the app
+        // is active; requesting them from an inactive app is silently ignored,
+        // leaving currentSystemPresentationOptions empty and the menu bar up.
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Window level alone does not get past the menu bar, so the editor has
+        // to ask for it to be hidden. Restored in close(), and the system
+        // restores it anyway as soon as another app becomes active.
+        //
+        // This must also happen before the display observer starts: hiding the
+        // menu bar and the Dock changes every screen's visibleFrame, which
+        // posts didChangeScreenParameters twice and would otherwise close the
+        // session we are in the middle of opening.
         savedPresentationOptions = NSApp.presentationOptions
         NSApp.presentationOptions = [.hideDock, .hideMenuBar]
 
-        NSApp.activate(ignoringOtherApps: true)
-        log("Layout editor opened for '\(bound.name)' across \(overlays.count) display(s)")
+        startDisplayChangeObserver()
+
+        let menuBarHidden = NSApp.currentSystemPresentationOptions.contains(.hideMenuBar)
+        log("Layout editor opened for '\(bound.name)' across \(overlays.count) display(s); "
+            + "menu bar hidden: \(menuBarHidden)")
         return nil
     }
 
@@ -368,6 +383,10 @@ final class LayoutEditorController {
     /// ends rather than writing geometry derived from displays that have moved.
     private func startDisplayChangeObserver() {
         stopDisplayChangeObserver()
+
+        openingDisplayBounds = Dictionary(
+            uniqueKeysWithValues: DisplayRegistry.shared.displays.map { ($0.key, $0.axBounds) })
+
         displayChangeObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil,
@@ -375,6 +394,16 @@ final class LayoutEditorController {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.isOpen else { return }
+
+                // The notification fires for things that do not move a display,
+                // such as the Dock changing size or the menu bar being hidden.
+                // Only the displays actually moving invalidates the session, and
+                // CGDisplayBounds is unaffected by either of those.
+                DisplayRegistry.shared.refresh()
+                let current = Dictionary(
+                    uniqueKeysWithValues: DisplayRegistry.shared.displays.map { ($0.key, $0.axBounds) })
+                guard current != self.openingDisplayBounds else { return }
+
                 log("Layout editor: display configuration changed, closing without saving")
                 self.close(saving: false)
 
@@ -394,6 +423,7 @@ final class LayoutEditorController {
             NotificationCenter.default.removeObserver(displayChangeObserver)
         }
         displayChangeObserver = nil
+        openingDisplayBounds = [:]
     }
 
     /// Returns true when the event was consumed.

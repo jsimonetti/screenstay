@@ -91,6 +91,18 @@ This is deliberate rather than cosmetic. Baking a 3 point inset into each rectan
 
 The gap applies to every region uniformly. The existing per region values do not encode a rule worth preserving: `3` appears twelve times, `0` five times across both focus and non focus regions, and `5` once on a region that is `0` in a sibling profile.
 
+## The menu bar
+
+macOS will not let a window sit under the menu bar, so part of a display is not placeable. The editor hides the menu bar while it is open, which would otherwise make that strip look available when it is not.
+
+`RegionGeometry.contentAXFrame` intersects the resolved frame with the display minus the menu bar, before applying the gutter. Intersecting matters: macOS constrains only a window's *origin*, so a region starting at the top of a display gets pushed down while keeping its height and its bottom edge ends up past the end of the display. Intersecting shortens it instead. Clamping runs before the gutter so the window sits a gutter's width below the menu bar rather than flush against it.
+
+The clamp is to the menu bar only, not to `visibleFrame`. That also excludes the Dock, but macOS does not enforce the Dock: windows may sit under it and it floats above them. Clamping to it would shrink windows further than the system does, and would resize every bottom-edge window the day the Dock stops auto-hiding.
+
+The editor draws the reserved strip hatched, over the regions rather than under them, since a region may be authored to overlap it and the point is to show what will be cut away. The measurement comes from the display as captured when the session opened; reading it live reports nothing, because hiding the menu bar grows every screen's `visibleFrame`.
+
+`Snap Edge` offers the placeable edge as a candidate, so stored geometry can be made to match where a window actually lands.
+
 ## Safety
 
 Every region shows a badge with what it carries, for example `4 apps, Ctrl Cmd C`, so a delete never silently discards assignments. Undo and redo cover every action. `Esc` prompts and names what would be lost.

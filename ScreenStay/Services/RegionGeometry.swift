@@ -58,15 +58,41 @@ enum RegionGeometry {
         return clamped
     }
 
-    /// Absolute frame a window should actually be given, i.e. with the gutter applied.
+    /// Absolute frame a window should actually be given.
     ///
-    /// The gap lives in global settings rather than in the region, so region
-    /// rectangles keep tiling exactly and adjacent edges stay coincident.
+    /// Two things happen here that the stored region deliberately does not know
+    /// about. The frame is cut down to the area a window can occupy, and then
+    /// the gutter is applied.
+    ///
+    /// The clamp is a rectangle intersection, not a nudge. macOS constrains only
+    /// the *origin* of a window, so a region starting at the top of a display
+    /// gets pushed down while keeping its height, and its bottom edge ends up
+    /// past the end of the display. Intersecting shortens it instead, which is
+    /// what was actually wanted.
+    ///
+    /// Clamping runs before the gutter so the window sits a gutter's width below
+    /// the menu bar, like every other edge. The other way round the clamp would
+    /// override the inset and leave it flush.
     static func contentAXFrame(for region: Region, gap: CGFloat, in registry: DisplayRegistry) -> CGRect? {
-        guard let frame = absoluteAXFrame(for: region, in: registry) else {
+        guard let display = display(for: region, in: registry) else {
             return nil
         }
-        return inset(frame, by: gap)
+
+        let frame = absoluteAXFrame(for: region.relativeFrame, on: display, regionName: region.name)
+        let placeable = frame.intersection(display.axPlacementBounds)
+
+        guard !placeable.isNull, placeable.width > 0, placeable.height > 0 else {
+            log("Region '\(region.name)' lies entirely under the menu bar of display "
+                + "'\(display.key)'; nothing to place")
+            return nil
+        }
+
+        if placeable != frame {
+            log("Region '\(region.name)' overlaps the menu bar on '\(display.key)'; "
+                + "placing in \(rectDescription(placeable)) instead of \(rectDescription(frame))")
+        }
+
+        return inset(placeable, by: gap)
     }
 
     /// Absolute frame in Cocoa space, for handing to AppKit.

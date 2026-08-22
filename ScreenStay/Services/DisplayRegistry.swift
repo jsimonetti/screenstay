@@ -18,10 +18,38 @@ final class DisplayRegistry {
         let name: String
         /// Full display rect in AX space.
         let axBounds: CGRect
-        /// Display rect minus the menu bar and Dock, in AX space. Useful for
-        /// snapping in the layout editor; region geometry is *not* implicitly
-        /// inset by it.
+        /// Display rect minus the menu bar and Dock, in AX space.
         let axVisibleBounds: CGRect
+        /// Area a window can actually be placed in: the display minus the menu
+        /// bar, and nothing else.
+        ///
+        /// Deliberately not `axVisibleBounds`. That also excludes the Dock, but
+        /// macOS does not enforce the Dock - windows may sit under it and it
+        /// floats above them - so clamping to it would shrink windows more than
+        /// the system itself does, and would resize every bottom-edge window the
+        /// day the Dock stops auto-hiding.
+        let axPlacementBounds: CGRect
+
+        /// Height the menu bar takes off the top of this display, if any.
+        var menuBarInset: CGFloat { axPlacementBounds.minY - axBounds.minY }
+
+        init(
+            key: String,
+            displayID: CGDirectDisplayID,
+            isBuiltIn: Bool,
+            name: String,
+            axBounds: CGRect,
+            axVisibleBounds: CGRect? = nil,
+            axPlacementBounds: CGRect? = nil
+        ) {
+            self.key = key
+            self.displayID = displayID
+            self.isBuiltIn = isBuiltIn
+            self.name = name
+            self.axBounds = axBounds
+            self.axVisibleBounds = axVisibleBounds ?? axBounds
+            self.axPlacementBounds = axPlacementBounds ?? axBounds
+        }
     }
 
     private(set) var displays: [ResolvedDisplay] = []
@@ -92,17 +120,27 @@ final class DisplayRegistry {
             // never have to think about which space a bound is in.
             let visible = screen.map { CoordinateSpace.cocoaToAX($0.visibleFrame) } ?? bounds
 
+            // Only the top inset is the menu bar; the Dock never sits at the top,
+            // so anything visibleFrame takes off the other three edges is Dock.
+            let menuBar = max(0, visible.minY - bounds.minY)
+            let placement = CGRect(x: bounds.minX, y: bounds.minY + menuBar,
+                                   width: bounds.width, height: bounds.height - menuBar)
+
             return ResolvedDisplay(
                 key: key,
                 displayID: displayID,
                 isBuiltIn: CGDisplayIsBuiltin(displayID) != 0,
                 name: screen?.localizedName ?? "Display \(displayID)",
                 axBounds: bounds,
-                axVisibleBounds: visible
+                axVisibleBounds: visible,
+                axPlacementBounds: placement
             )
         }
 
-        let summary = displays.map { "\($0.key)@\(Int($0.axBounds.minX)),\(Int($0.axBounds.minY))" }
+        let summary = displays.map {
+            "\($0.key)@\(Int($0.axBounds.minX)),\(Int($0.axBounds.minY))"
+                + ($0.menuBarInset > 0 ? " menuBar:\(Int($0.menuBarInset))" : "")
+        }
         log("Display registry refreshed: \(summary.joined(separator: " "))")
     }
 }

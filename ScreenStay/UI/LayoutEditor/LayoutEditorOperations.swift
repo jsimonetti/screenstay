@@ -121,6 +121,14 @@ enum LayoutEditorOperations {
         let horizontal = edge == .left || edge == .right
 
         var candidates: [CGFloat] = horizontal ? [bounds.minX, bounds.maxX] : [bounds.minY, bounds.maxY]
+
+        // The edge of the placeable area is worth snapping to as well, so stored
+        // geometry can be made to match where a window will actually land.
+        if !horizontal {
+            candidates.append(display.axPlacementBounds.minY - display.axBounds.minY)
+            candidates.append(display.axPlacementBounds.maxY - display.axBounds.minY)
+        }
+
         for neighbour in neighbours {
             let other = neighbour.relativeFrame
             candidates += horizontal ? [other.minX, other.maxX] : [other.minY, other.maxY]

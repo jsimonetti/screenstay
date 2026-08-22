@@ -61,6 +61,7 @@ final class LayoutEditorCanvasView: NSView {
             draw(region, on: display)
         }
 
+        drawReservedBand(on: display)
         drawHandles(on: display)
         drawDisplayLabel(display)
         drawHint()
@@ -165,6 +166,60 @@ final class LayoutEditorCanvasView: NSView {
 
         drawText(assignmentSummary(for: region), at: NSPoint(x: rect.minX + 9, y: rect.minY + 8),
                  size: 10, weight: .regular, color: .white.withAlphaComponent(0.75))
+    }
+
+    /// The strip the menu bar occupies, which no window can be placed in.
+    ///
+    /// Drawn over the regions rather than under them, because a region may be
+    /// authored to overlap it and the point is to show that the overlap will be
+    /// cut away at placement time.
+    ///
+    /// The measurement comes from the display captured when the session opened.
+    /// Reading it live would report nothing, since the editor hides the menu bar
+    /// and `visibleFrame` grows the moment it does.
+    private func drawReservedBand(on display: DisplayRegistry.ResolvedDisplay) {
+        let inset = display.menuBarInset
+        guard inset > 0 else { return }
+
+        let band = Self.viewRect(
+            for: CGRect(x: 0, y: 0, width: display.axBounds.width, height: inset), on: display)
+
+        NSColor.black.withAlphaComponent(0.45).setFill()
+        band.fill()
+
+        // Hatching, so it reads as unavailable rather than merely dark.
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(rect: band).setClip()
+        NSColor.white.withAlphaComponent(0.10).setStroke()
+        let stripe = NSBezierPath()
+        stripe.lineWidth = 1
+        var x = band.minX - band.height
+        while x < band.maxX {
+            stripe.move(to: NSPoint(x: x, y: band.minY))
+            stripe.line(to: NSPoint(x: x + band.height, y: band.maxY))
+            x += 8
+        }
+        stripe.stroke()
+        NSGraphicsContext.restoreGraphicsState()
+
+        NSColor.white.withAlphaComponent(0.30).setStroke()
+        let edge = NSBezierPath()
+        edge.move(to: NSPoint(x: band.minX, y: band.minY))
+        edge.line(to: NSPoint(x: band.maxX, y: band.minY))
+        edge.lineWidth = 1
+        edge.stroke()
+
+        let label = "menu bar  \(Int(inset)) pt  -  windows cannot be placed here"
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: 10, weight: .medium),
+            .foregroundColor: NSColor.white.withAlphaComponent(0.6)
+        ]
+        let size = label.size(withAttributes: attributes)
+        if band.height >= size.height {
+            label.draw(at: NSPoint(x: band.midX - size.width / 2,
+                                   y: band.midY - size.height / 2),
+                       withAttributes: attributes)
+        }
     }
 
     /// Solid pills mark a boundary shared with another region, where dragging

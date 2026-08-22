@@ -9,6 +9,13 @@ import AppKit
 @MainActor
 final class LayoutEditorOverlayWindow: NSWindow {
 
+    /// Snapshot of the display as it was when the session opened.
+    ///
+    /// Held by value on purpose. The session hides the menu bar straight after
+    /// creating these windows, which grows every screen's `visibleFrame`, and
+    /// the display-change observer refreshes the shared registry afterwards.
+    /// Anything reading the registry from here on would see no menu bar at all
+    /// and draw no reserved band.
     let display: DisplayRegistry.ResolvedDisplay
     let canvas: LayoutEditorCanvasView
 

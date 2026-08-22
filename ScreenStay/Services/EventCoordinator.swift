@@ -226,12 +226,16 @@ class EventCoordinator: ObservableObject {
     }
     
     private func handleDisplayChange() async {
+        // Re-read the displays before anything tries to resolve a region
+        DisplayRegistry.shared.refresh()
+        borderOverlay.invalidateScreenCache()
+
         // Clear any focused window since display topology changed
         focusRegionManager.clearFocus()
-        
+
         // Reset window tracking since display topology changed
         windowEventMonitor.resetPositionedWindows()
-        
+
         // Auto-select matching profile
         if let profile = await profileManager.autoSelectProfile() {
             // Reposition all windows
@@ -293,11 +297,12 @@ class EventCoordinator: ObservableObject {
     
     // MARK: - Keyboard Shortcuts
     
-    private func setupKeyboardShortcuts() async {
+    /// Every shortcut the handler should watch for: one per region, plus the
+    /// two global ones.
+    private func collectShortcuts() async -> [KeyboardShortcut] {
         let regions = await profileManager.activeRegions
         let config = await profileManager.getConfiguration()
-        
-        // Collect all shortcuts (region shortcuts + reset window shortcut + focus window shortcut)
+
         var shortcuts = regions.compactMap { $0.keyboardShortcut }
         if let resetShortcut = config.globalSettings.resetWindowShortcut {
             shortcuts.append(resetShortcut)
@@ -305,7 +310,12 @@ class EventCoordinator: ObservableObject {
         if let focusShortcut = config.globalSettings.focusWindowShortcut {
             shortcuts.append(focusShortcut)
         }
-        
+        return shortcuts
+    }
+
+    private func setupKeyboardShortcuts() async {
+        let shortcuts = await collectShortcuts()
+
         keyboardHandler.start(shortcuts: shortcuts) { [weak self] shortcut in
             guard let self = self else { return }
             
@@ -336,10 +346,14 @@ class EventCoordinator: ObservableObject {
         }
     }
     
+    /// Swap in a new shortcut list without disturbing the event tap.
+    ///
+    /// Only the list changes: the handler resolves the region, the profile and
+    /// the global settings when a shortcut actually fires, so it never holds a
+    /// stale copy of any of them. Rebuilding the tap here would mean tearing
+    /// down and re-registering with the window server on every config save.
     func updateKeyboardShortcuts() async {
-        // Simply call setupKeyboardShortcuts to restart the handler with updated shortcuts
-        // This ensures both the shortcut list and the callback logic are properly updated
-        await setupKeyboardShortcuts()
+        keyboardHandler.updateShortcuts(await collectShortcuts())
     }
     
     // MARK: - Reset Window Handler

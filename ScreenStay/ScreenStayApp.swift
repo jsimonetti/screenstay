@@ -32,10 +32,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Start as menu bar only app (no dock icon)
         NSApp.setActivationPolicy(.accessory)
-        
-        // Check all permissions
-        PermissionManager.checkAndRequestPermissions()
-        
+
         // Initialize services
         Task {
             let profileManager = ProfileManager()
@@ -58,15 +55,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             )
             self.eventCoordinator = coordinator
             
-            // Setup menu bar
+            // Setup menu bar. Done before the permission check so there is a
+            // way to reach Settings and Quit even while access is pending.
             setupMenuBar()
-            
-            // Start event listeners
-            await coordinator.start()
-            
-            // Update menu to reflect active profile
-            updateProfilesMenu()
-            
+
+            // Start event listeners once Accessibility is available. Everything
+            // the coordinator does needs it, and granting it now takes effect
+            // without restarting the app.
+            PermissionManager.waitForAccessibility { [weak self] in
+                Task { @MainActor in
+                    await coordinator.start()
+                    self?.updateProfilesMenu()
+                    log("ScreenStay ready")
+                }
+            }
+
             // Observe window lifecycle to manage dock visibility
             NotificationCenter.default.addObserver(
                 self,
@@ -74,8 +77,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 name: NSWindow.willCloseNotification,
                 object: nil
             )
-            
-            log("ScreenStay ready")
         }
     }
     
@@ -95,6 +96,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
+        PermissionManager.cancelWaiting()
         eventCoordinator?.stop()
     }
     

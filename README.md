@@ -86,14 +86,34 @@ make install    # Build and copy to /Applications
 
 ### Code Signing
 
-macOS requires applications to be signed to run without security warnings. The Makefile includes a signing target.
+macOS keys Accessibility permission to an app's code signature, so how you sign
+determines whether that permission survives a rebuild.
+
+The Makefile signs ad-hoc by default, which needs no certificate and no
+developer account:
+
+```bash
+make sign
+```
+
+That is enough to build and run from a clean checkout. The catch is that an
+ad-hoc signature is identified by a hash of the binary itself, so **every
+rebuild produces a new identity and you have to grant Accessibility again**.
+`make sign` prints a reminder.
+
+Signing with a real certificate gives the app a stable identity and the
+permission sticks across rebuilds. Any Apple Development certificate works, and
+so does a self-signed one.
+
+Keep your signing identity out of the `Makefile`, which is committed. Put it in
+`Makefile.local`, which is gitignored.
 
 ### Creating a Self-Signed Certificate
 
-If you don't have a Developer ID certificate, create a self-signed certificate for local development using Keychain Access:
+If you don't have a developer certificate, create a self-signed one using
+Keychain Access:
 
 ```bash
-# Open Keychain Access
 open "/System/Applications/Utilities/Keychain Access.app"
 ```
 
@@ -113,33 +133,36 @@ Verify the certificate was created:
 security find-identity -v -p codesigning
 ```
 
-To sign the application with your certificate:
-
-```bash
-# Sign using the Makefile
-make sign SIGNING_IDENTITY="ScreenStay Code Signing"
-```
-
 ### Custom Build Configuration
 
-For personal build settings, create a `Makefile.local` to override defaults:
+Create a `Makefile.local` to sign with your own certificate. That file is
+gitignored, so your identity never leaves your machine:
 
 ```makefile
-SIGNING_IDENTITY = "Apple Development: Your Name (TEAM_ID)"
+SIGNING_IDENTITY = 'ScreenStay Code Signing'
 
-.PHONY: all
+.PHONY: all sign install
 
-all:
-	@$(MAKE) clean
-	@$(MAKE) build
-	@$(MAKE) sign SIGNING_IDENTITY='$(SIGNING_IDENTITY)'
+all: sign
+
+sign:
+	@$(MAKE) -f Makefile clean
+	@$(MAKE) -f Makefile build
+	@$(MAKE) -f Makefile sign SIGNING_IDENTITY=$(SIGNING_IDENTITY)
+
+install: sign
+	@$(MAKE) -f Makefile install
 ```
 
-Then build and sign with:
+Then build, sign and install with:
 
 ```bash
-make -f Makefile.local
+make -f Makefile.local install
 ```
+
+`make install` refuses to install a bundle that is unsigned or signed under the
+wrong identifier, because macOS would treat it as a different app from the one
+already in your Accessibility list.
 
 ## Configuration
 
@@ -168,12 +191,19 @@ The menu bar icon provides access to:
 
 ## Permissions
 
-ScreenStay requires two system permissions:
+ScreenStay needs one system permission: **Accessibility**.
 
-1. **Accessibility**: Required to read window information and reposition windows
-2. **Input Monitoring**: Required to capture keyboard shortcuts
+It covers both jobs the app does. Reading and repositioning windows goes through
+the Accessibility API, and capturing keyboard shortcuts uses a CGEventTap, which
+macOS allows for any process that is a trusted Accessibility client.
 
-The app will prompt for these permissions on first launch. You can also grant them manually in System Settings under Privacy & Security.
+You may see Input Monitoring mentioned in connection with event taps. ScreenStay
+does not need it and will never appear in that list. The Accessibility grant is
+what makes the shortcuts work.
+
+Grant it in System Settings, Privacy & Security, Accessibility. ScreenStay
+prompts on first launch and picks the grant up as soon as you give it, with no
+restart needed.
 
 ## Logs
 

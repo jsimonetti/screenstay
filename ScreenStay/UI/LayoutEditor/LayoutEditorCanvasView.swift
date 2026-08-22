@@ -57,8 +57,15 @@ final class LayoutEditorCanvasView: NSView {
         backdrop.setFill()
         bounds.fill()
 
-        for region in regions {
+        // The selected region is drawn last so its highlight is never painted
+        // over by a region further along the array. Without this, selecting
+        // anything below a full-screen region looks like nothing happened.
+        for region in regions where region.id != selectedRegionID {
             draw(region, on: display)
+        }
+        if let selectedRegionID,
+           let selected = regions.first(where: { $0.id == selectedRegionID }) {
+            draw(selected, on: display)
         }
 
         drawReservedBand(on: display)

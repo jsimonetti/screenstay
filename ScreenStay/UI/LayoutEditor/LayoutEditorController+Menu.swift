@@ -111,17 +111,6 @@ extension LayoutEditorController {
         menu.addItem(focus)
 
         menu.addItem(.separator())
-
-        let isTop = currentRegions.last?.id == region.id
-        let isBottom = currentRegions.first?.id == region.id
-        menu.addItem(menuItem("Bring to Front", enabled: !isTop) { [weak self] in
-            self?.move(region, toFront: true)
-        })
-        menu.addItem(menuItem("Send to Back", enabled: !isBottom) { [weak self] in
-            self?.move(region, toFront: false)
-        })
-
-        menu.addItem(.separator())
         menu.addItem(menuItem("Delete Region") { [weak self] in self?.delete(region) })
 
         return menu
@@ -208,18 +197,6 @@ extension LayoutEditorController {
     private func delete(_ region: Region) {
         mutate("deleted \(region.name)") { regions in
             regions.removeAll { $0.id == region.id }
-        }
-    }
-
-    private func move(_ region: Region, toFront: Bool) {
-        mutate("reordered \(region.name)") { regions in
-            guard let index = regions.firstIndex(where: { $0.id == region.id }) else { return }
-            let moved = regions.remove(at: index)
-            if toFront {
-                regions.append(moved)
-            } else {
-                regions.insert(moved, at: 0)
-            }
         }
     }
 

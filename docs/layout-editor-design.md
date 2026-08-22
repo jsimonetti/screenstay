@@ -81,7 +81,9 @@ The editor requires the profile's displays to be attached. It opens when `Profil
 
 ## Z-order
 
-Array order in `Profile.regions` is the z-order, last is topmost. `Bring to Front` and `Send to Back` reorder the array. No schema change, and runtime behaviour is unaffected because regions are addressed by keyboard shortcut and bundle identifier, never by point.
+Array order in `Profile.regions` is the z-order, last is topmost. It decides hit-test priority and paint order, except that the selected region is always painted last so its highlight cannot be covered by a region further along the array.
+
+There is deliberately no way to reorder from the editor. `Bring to Front` and `Send to Back` existed briefly and were removed: `Select Region` already reaches a region buried under another, which was their only real use, and reordering is not as free as it looks. `EventCoordinator` picks a region for a launching app with `regions.first(where:)`, so if an app is ever assigned to two regions the array order silently decides which one wins. Exposing that as a cosmetic editor action invites changing runtime behaviour by accident. If duplicate assignments become a problem the answer is to warn about them, not to hand out z-order controls.
 
 ## Gutter
 

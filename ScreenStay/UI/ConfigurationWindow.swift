@@ -21,6 +21,8 @@ class ConfigurationWindow: NSWindowController {
     private let profilesTableView = NSTableView()
     private let captureDisplaysButton = NSButton()
     private let activateProfileButton = NSButton()
+    private let layoutEditorButton = NSButton()
+    private let layoutEditor = LayoutEditorController()
     private let addProfileButton = NSButton()
     private let deleteProfileButton = NSButton()
     
@@ -172,10 +174,18 @@ class ConfigurationWindow: NSWindowController {
         activateProfileButton.target = self
         activateProfileButton.action = #selector(activateProfile)
         
+        layoutEditorButton.title = "Layout Editor\u{2026}"
+        layoutEditorButton.bezelStyle = .rounded
+        layoutEditorButton.setButtonType(.momentaryPushIn)
+        layoutEditorButton.target = self
+        layoutEditorButton.action = #selector(openLayoutEditor)
+        layoutEditorButton.toolTip = "Arrange this profile's regions directly on its displays"
+
         buttonStack.addArrangedSubview(addProfileButton)
         buttonStack.addArrangedSubview(deleteProfileButton)
         buttonStack.addArrangedSubview(captureDisplaysButton)
         buttonStack.addArrangedSubview(activateProfileButton)
+        buttonStack.addArrangedSubview(layoutEditorButton)
         
         containerView.addSubview(buttonStack)
         
@@ -307,6 +317,47 @@ class ConfigurationWindow: NSWindowController {
         regionsTableView.reloadData()
     }
     
+    // MARK: - Layout Editor
+
+    @objc private func openLayoutEditor() {
+        let selectedRow = profilesTableView.selectedRow
+        guard selectedRow >= 0, let profile = config?.profiles[safe: selectedRow] else {
+            showAlert(message: "Please select a profile to open in the layout editor")
+            return
+        }
+
+        // The region overlay and the editor both draw on the displays; only one
+        // of them should be up at a time.
+        overlayManager.hideOverlays(saveChanges: false)
+        toggleOverlayButton.title = "Show Overlay"
+
+        layoutEditor.onSave = { [weak self] profileID, regions in
+            guard let self, let index = self.config?.profiles.firstIndex(where: { $0.id == profileID }) else { return }
+            self.config?.profiles[index].regions = regions
+            self.regionsTableView.reloadData()
+        }
+
+        layoutEditor.onClose = { [weak self] in
+            guard let self, let window = self.window else { return }
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+
+        if let reason = layoutEditor.open(profile: profile) {
+            let message = LayoutEditorController.refusalMessage(for: reason, profileName: profile.name)
+            let alert = NSAlert()
+            alert.messageText = message.title
+            alert.informativeText = message.body
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            return
+        }
+
+        // Get the settings window out of the way while editing on the displays.
+        window?.orderOut(nil)
+    }
+
     @objc private func activateProfile() {
         let selectedRow = profilesTableView.selectedRow
         guard selectedRow >= 0, let profile = config?.profiles[safe: selectedRow] else {
@@ -1078,6 +1129,7 @@ class ConfigurationWindow: NSWindowController {
     }
     
     override func close() {
+        layoutEditor.close(saving: false)
         overlayManager.hideOverlays(saveChanges: false)
         super.close()
         

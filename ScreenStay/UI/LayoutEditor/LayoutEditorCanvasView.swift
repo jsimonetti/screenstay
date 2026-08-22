@@ -1,0 +1,164 @@
+import AppKit
+
+/// Draws one display's worth of the layout being edited.
+///
+/// Read-only for now: it renders what the profile contains so the coordinate
+/// pipeline can be checked against real hardware. Hit testing, dragging and the
+/// context menu come next.
+@MainActor
+final class LayoutEditorCanvasView: NSView {
+
+    var display: DisplayRegistry.ResolvedDisplay?
+    var profileName: String = ""
+
+    /// Regions belonging to this display, in z-order, bottom first.
+    var regions: [Region] = [] {
+        didSet { needsDisplay = true }
+    }
+
+    override var isFlipped: Bool { false }
+
+    // MARK: - Palette
+
+    private let backdrop = NSColor.black.withAlphaComponent(0.28)
+    private let regionLine = NSColor.white.withAlphaComponent(0.85)
+    private let regionFill = NSColor.white.withAlphaComponent(0.06)
+    private let focusLine = NSColor(calibratedRed: 1.0, green: 0.62, blue: 0.24, alpha: 1.0)
+
+    // MARK: - Drawing
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard let display else { return }
+
+        backdrop.setFill()
+        bounds.fill()
+
+        for region in regions {
+            draw(region, on: display)
+        }
+
+        drawDisplayLabel(display)
+        drawHint()
+    }
+
+    /// Where a display-relative region lands in this view's coordinates.
+    ///
+    /// Region geometry is stored relative to its display and in AX orientation,
+    /// so it is resolved against the display, flipped into Cocoa space, then
+    /// rebased onto the view, which covers exactly that display. Both space
+    /// conversions go through the shared helpers rather than being done by hand.
+    static func viewRect(
+        for relativeFrame: CGRect,
+        on display: DisplayRegistry.ResolvedDisplay
+    ) -> CGRect {
+        let absoluteAX = RegionGeometry.absoluteAXFrame(for: relativeFrame, on: display)
+        let displayOrigin = CoordinateSpace.axToCocoa(display.axBounds).origin
+        return CoordinateSpace.axToCocoa(absoluteAX)
+            .offsetBy(dx: -displayOrigin.x, dy: -displayOrigin.y)
+    }
+
+    private func draw(_ region: Region, on display: DisplayRegistry.ResolvedDisplay) {
+        let rect = Self.viewRect(for: region.relativeFrame, on: display)
+        guard rect.width > 2, rect.height > 2 else { return }
+
+        let isFocus = region.isFocusRegion
+        let line = isFocus ? focusLine : regionLine
+        let path = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 3, yRadius: 3)
+
+        (isFocus ? focusLine.withAlphaComponent(0.10) : regionFill).setFill()
+        path.fill()
+
+        line.setStroke()
+        path.lineWidth = isFocus ? 1.5 : 1
+        if isFocus {
+            path.setLineDash([6, 4], count: 2, phase: 0)
+        }
+        path.stroke()
+
+        drawText(region.name, at: NSPoint(x: rect.minX + 9, y: rect.maxY - 20),
+                 size: 11, weight: .medium, color: .white.withAlphaComponent(0.8))
+
+        let size = "\(Int(region.relativeFrame.width)) x \(Int(region.relativeFrame.height))"
+        drawCentredText(size, in: rect, size: 12, weight: .semibold, color: .white)
+
+        drawText(assignmentSummary(for: region), at: NSPoint(x: rect.minX + 9, y: rect.minY + 8),
+                 size: 10, weight: .regular, color: .white.withAlphaComponent(0.75))
+    }
+
+    /// What this region carries besides its rectangle, so nothing is deleted blind.
+    private func assignmentSummary(for region: Region) -> String {
+        var parts: [String] = []
+        parts.append(region.assignedApps.count == 1 ? "1 app" : "\(region.assignedApps.count) apps")
+        if let shortcut = region.keyboardShortcut {
+            let symbols = shortcut.modifiers.map(Self.symbol(for:)).joined()
+            parts.append("\(symbols)\(shortcut.key.uppercased())")
+        }
+        return parts.joined(separator: "  ")
+    }
+
+    private static func symbol(for modifier: String) -> String {
+        switch modifier {
+        case "control": return "\u{2303}"
+        case "option": return "\u{2325}"
+        case "shift": return "\u{21E7}"
+        case "cmd": return "\u{2318}"
+        default: return ""
+        }
+    }
+
+    private func drawDisplayLabel(_ display: DisplayRegistry.ResolvedDisplay) {
+        let text = "\(profileName)   \u{2022}   \(display.name)  "
+            + "\(Int(display.axBounds.width))x\(Int(display.axBounds.height))"
+        drawBadge(text, at: NSPoint(x: 18, y: bounds.maxY - 34))
+    }
+
+    private func drawHint() {
+        drawBadge("Esc to close", at: NSPoint(x: 18, y: 18))
+    }
+
+    private func drawBadge(_ text: String, at origin: NSPoint) {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .medium),
+            .foregroundColor: NSColor.white.withAlphaComponent(0.85)
+        ]
+        let size = text.size(withAttributes: attributes)
+        let box = NSRect(x: origin.x, y: origin.y, width: size.width + 14, height: size.height + 8)
+
+        NSColor.black.withAlphaComponent(0.55).setFill()
+        NSBezierPath(roundedRect: box, xRadius: 5, yRadius: 5).fill()
+        text.draw(at: NSPoint(x: box.minX + 7, y: box.minY + 4), withAttributes: attributes)
+    }
+
+    private func drawText(_ text: String, at point: NSPoint, size: CGFloat,
+                          weight: NSFont.Weight, color: NSColor) {
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.85)
+        shadow.shadowBlurRadius = 3
+        shadow.shadowOffset = NSSize(width: 0, height: -1)
+
+        text.draw(at: point, withAttributes: [
+            .font: NSFont.systemFont(ofSize: size, weight: weight),
+            .foregroundColor: color,
+            .shadow: shadow
+        ])
+    }
+
+    private func drawCentredText(_ text: String, in rect: NSRect, size: CGFloat,
+                                 weight: NSFont.Weight, color: NSColor) {
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.85)
+        shadow.shadowBlurRadius = 4
+        shadow.shadowOffset = NSSize(width: 0, height: -1)
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: size, weight: weight),
+            .foregroundColor: color,
+            .shadow: shadow
+        ]
+        let textSize = text.size(withAttributes: attributes)
+        text.draw(at: NSPoint(x: rect.midX - textSize.width / 2,
+                              y: rect.midY - textSize.height / 2),
+                  withAttributes: attributes)
+    }
+}

@@ -9,7 +9,7 @@ import CoreGraphics
 @MainActor
 enum RegionGeometry {
 
-    /// Smallest window edge we will ever ask for, so padding can never invert a rect.
+    /// Smallest window edge we will ever ask for, so the gutter can never invert a rect.
     private static let minimumEdge: CGFloat = 1
 
     // MARK: - Resolution
@@ -58,12 +58,15 @@ enum RegionGeometry {
         return clamped
     }
 
-    /// Absolute frame a window should actually be given, i.e. with padding applied.
-    static func contentAXFrame(for region: Region, in registry: DisplayRegistry) -> CGRect? {
+    /// Absolute frame a window should actually be given, i.e. with the gutter applied.
+    ///
+    /// The gap lives in global settings rather than in the region, so region
+    /// rectangles keep tiling exactly and adjacent edges stay coincident.
+    static func contentAXFrame(for region: Region, gap: CGFloat, in registry: DisplayRegistry) -> CGRect? {
         guard let frame = absoluteAXFrame(for: region, in: registry) else {
             return nil
         }
-        return inset(frame, by: region.padding)
+        return inset(frame, by: gap)
     }
 
     /// Absolute frame in Cocoa space, for handing to AppKit.
@@ -112,8 +115,8 @@ enum RegionGeometry {
         absoluteAXFrame(for: region, in: .shared)
     }
 
-    static func contentAXFrame(for region: Region) -> CGRect? {
-        contentAXFrame(for: region, in: .shared)
+    static func contentAXFrame(for region: Region, gap: CGFloat) -> CGRect? {
+        contentAXFrame(for: region, gap: gap, in: .shared)
     }
 
     static func absoluteCocoaFrame(for region: Region) -> CGRect? {
@@ -128,15 +131,15 @@ enum RegionGeometry {
 
     /// Inset a rect on all four edges, refusing to produce a degenerate rect.
     ///
-    /// Padding larger than half the region would otherwise yield a negative
-    /// size, which the Accessibility API accepts and renders as a broken window.
-    static func inset(_ rect: CGRect, by padding: CGFloat) -> CGRect {
-        guard padding > 0 else { return rect }
+    /// A gap larger than half the region would otherwise yield a negative size,
+    /// which the Accessibility API accepts and renders as a broken window.
+    static func inset(_ rect: CGRect, by gap: CGFloat) -> CGRect {
+        guard gap > 0 else { return rect }
 
         let maxHorizontal = max(0, (rect.width - minimumEdge) / 2)
         let maxVertical = max(0, (rect.height - minimumEdge) / 2)
-        let horizontal = min(padding, maxHorizontal)
-        let vertical = min(padding, maxVertical)
+        let horizontal = min(gap, maxHorizontal)
+        let vertical = min(gap, maxVertical)
 
         return rect.insetBy(dx: horizontal, dy: vertical)
     }

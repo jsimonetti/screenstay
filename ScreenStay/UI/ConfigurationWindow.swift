@@ -45,6 +45,7 @@ class ConfigurationWindow: NSWindowController {
     private let borderColorWell = NSColorWell()
     private let borderWidthField = NSTextField()
     private let appSwitcherScaleField = NSTextField()
+    private let windowGapField = NSTextField()
     
     init(profileManager: ProfileManager, eventCoordinator: EventCoordinator) {
         self.profileManager = profileManager
@@ -920,7 +921,50 @@ class ConfigurationWindow: NSWindowController {
         scaleContainer.addArrangedSubview(scaleHint)
         
         stackView.addArrangedSubview(scaleContainer)
-        
+
+        // Window Gap
+        let gapHeader = NSTextField(labelWithString: "Window Gap")
+        gapHeader.font = .systemFont(ofSize: 13, weight: .semibold)
+        stackView.addArrangedSubview(gapHeader)
+
+        let gapHelp = NSTextField(wrappingLabelWithString:
+            "Space left around every window inside its region. Applied when a window is placed, "
+            + "so regions themselves stay edge to edge.")
+        gapHelp.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        gapHelp.textColor = .secondaryLabelColor
+        gapHelp.maximumNumberOfLines = 2
+        gapHelp.translatesAutoresizingMaskIntoConstraints = false
+        stackView.addArrangedSubview(gapHelp)
+        NSLayoutConstraint.activate([
+            gapHelp.widthAnchor.constraint(equalToConstant: 500)
+        ])
+
+        let gapContainer = NSStackView()
+        gapContainer.orientation = .horizontal
+        gapContainer.spacing = 8
+        gapContainer.alignment = .centerY
+
+        let gapLabel = NSTextField(labelWithString: "Gap:")
+        gapLabel.font = .systemFont(ofSize: 13)
+        gapContainer.addArrangedSubview(gapLabel)
+
+        windowGapField.stringValue = "\(Int(config?.globalSettings.windowGap ?? ConfigurationMigration.defaultWindowGap))"
+        windowGapField.placeholderString = "3"
+        windowGapField.translatesAutoresizingMaskIntoConstraints = false
+        windowGapField.toolTip = "Points of space around each placed window. 0 for none."
+        gapContainer.addArrangedSubview(windowGapField)
+
+        NSLayoutConstraint.activate([
+            windowGapField.widthAnchor.constraint(equalToConstant: 60)
+        ])
+
+        let gapHint = NSTextField(labelWithString: "points (0-100)")
+        gapHint.textColor = .tertiaryLabelColor
+        gapHint.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        gapContainer.addArrangedSubview(gapHint)
+
+        stackView.addArrangedSubview(gapContainer)
+
         containerView.addSubview(stackView)
         
         NSLayoutConstraint.activate([
@@ -1000,6 +1044,7 @@ class ConfigurationWindow: NSWindowController {
                 
                 // Update app switcher scale
                 appSwitcherScaleField.stringValue = String(format: "%.1f", config.globalSettings.appSwitcherScale)
+                windowGapField.stringValue = "\(Int(config.globalSettings.windowGap))"
             }
             
             // Select the active profile (or first profile if none active)
@@ -1070,6 +1115,10 @@ class ConfigurationWindow: NSWindowController {
         }
         
         // Update app switcher scale
+        if let gap = Double(windowGapField.stringValue), gap >= 0 && gap <= 100 {
+            config.globalSettings.windowGap = gap
+        }
+
         if let scale = Double(appSwitcherScaleField.stringValue), scale >= 0.5 && scale <= 2.0 {
             config.globalSettings.appSwitcherScale = scale
         } else {

@@ -47,9 +47,9 @@ class EventCoordinator: ObservableObject {
         
         // Auto-select initial profile
         if let profile = await profileManager.autoSelectProfile() {
-            await windowPositionEnforcer.enforceAllRegions(profile.regions)
+            await windowPositionEnforcer.enforceAllRegions(profile.regions, gap: await windowGap())
         }
-        
+
         // Start border overlay if enabled
         let config = await profileManager.getConfiguration()
         borderOverlay.start(
@@ -96,6 +96,11 @@ class EventCoordinator: ObservableObject {
         print("🛑 Event listeners stopped")
     }
     
+    /// Gutter left around every placed window, from global settings.
+    private func windowGap() async -> CGFloat {
+        CGFloat(await profileManager.getConfiguration().globalSettings.windowGap)
+    }
+
     /// Update border overlay settings from configuration
     func updateBorderSettings() async {
         let config = await profileManager.getConfiguration()
@@ -203,7 +208,8 @@ class EventCoordinator: ObservableObject {
         
         // Reposition this window and mark it as positioned
         // This handles the race condition where app activates before observer is created
-        await windowPositionEnforcer.enforceRegion(region, for: app, window: window)
+        await windowPositionEnforcer.enforceRegion(
+            region, for: app, gap: CGFloat(config.globalSettings.windowGap), window: window)
         windowEventMonitor.markWindowAsPositioned(window)
     }
     
@@ -239,7 +245,7 @@ class EventCoordinator: ObservableObject {
         // Auto-select matching profile
         if let profile = await profileManager.autoSelectProfile() {
             // Reposition all windows
-            await windowPositionEnforcer.enforceAllRegions(profile.regions)
+            await windowPositionEnforcer.enforceAllRegions(profile.regions, gap: await windowGap())
         }
     }
     
@@ -277,7 +283,8 @@ class EventCoordinator: ObservableObject {
         }
         
         // Reposition the window and mark it as positioned
-        await windowPositionEnforcer.enforceRegion(region, for: app, window: window)
+        await windowPositionEnforcer.enforceRegion(
+            region, for: app, gap: CGFloat(config.globalSettings.windowGap), window: window)
         windowEventMonitor.markWindowAsPositioned(window)
         
         // Update border overlay for the newly created window
@@ -382,7 +389,8 @@ class EventCoordinator: ObservableObject {
         }
         
         // Reposition the window
-        await windowPositionEnforcer.enforceRegion(region, for: frontmostApp, window: focusedWindow)
+        await windowPositionEnforcer.enforceRegion(
+            region, for: frontmostApp, gap: await windowGap(), window: focusedWindow)
     }
     
     // MARK: - Focus Window Handler
@@ -420,6 +428,7 @@ class EventCoordinator: ObservableObject {
         }
         
         // Focus the window (this will unfocus any previously focused window)
-        focusRegionManager.focusWindow(frontmostWindow, windowID: windowID, toRegion: focusRegion)
+        focusRegionManager.focusWindow(
+            frontmostWindow, windowID: windowID, toRegion: focusRegion, gap: await windowGap())
     }
 }

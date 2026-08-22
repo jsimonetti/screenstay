@@ -20,7 +20,7 @@ class FocusRegionManager {
     }
     
     /// Move a window to the focus region
-    func focusWindow(_ window: AXUIElement, windowID: CGWindowID, toRegion region: Region) {
+    func focusWindow(_ window: AXUIElement, windowID: CGWindowID, toRegion region: Region, gap: CGFloat) {
         // Check if there's already a focused window and unfocus it first
         if let existingID = focusedWindowID, existingID != windowID {
             unfocusWindow()
@@ -34,8 +34,8 @@ class FocusRegionManager {
         
         let currentFrame = CGRect(origin: currentPosition, size: currentSize)
 
-        // Resolve the focus region against its display, then apply padding
-        guard let targetFrame = RegionGeometry.contentAXFrame(for: region) else {
+        // Resolve the focus region against its display, then apply the gutter
+        guard let targetFrame = RegionGeometry.contentAXFrame(for: region, gap: gap) else {
             log("Cannot focus window: region '\(region.name)' has no attached display")
             return
         }

@@ -26,7 +26,7 @@ actor WindowPositionEnforcer {
     /// size or a fixed aspect ratio and will simply ignore part of what we ask
     /// for. We set what the region calls for and accept whatever comes back.
     @MainActor
-    func enforceRegion(_ region: Region, for app: NSRunningApplication, window: AXUIElement? = nil) async {
+    func enforceRegion(_ region: Region, for app: NSRunningApplication, gap: CGFloat, window: AXUIElement? = nil) async {
         let targetWindow = window ?? accessibilityService.getFrontmostWindow(for: app)
 
         guard let targetWindow = targetWindow else {
@@ -38,8 +38,8 @@ actor WindowPositionEnforcer {
             return
         }
 
-        // Resolve the region against the display it names, then apply padding.
-        guard let targetFrame = RegionGeometry.contentAXFrame(for: region) else {
+        // Resolve the region against the display it names, then apply the gutter.
+        guard let targetFrame = RegionGeometry.contentAXFrame(for: region, gap: gap) else {
             log("Cannot place '\(app.bundleIdentifier ?? "?")': region '\(region.name)' has no attached display")
             return
         }
@@ -63,7 +63,7 @@ actor WindowPositionEnforcer {
     
     /// Reposition all windows for assigned apps in the given regions
     @MainActor
-    func enforceAllRegions(_ regions: [Region]) async {
+    func enforceAllRegions(_ regions: [Region], gap: CGFloat) async {
         // Build a map of bundleID -> region
         var appToRegion: [String: Region] = [:]
         for region in regions {
@@ -82,7 +82,7 @@ actor WindowPositionEnforcer {
                 continue
             }
             
-            await enforceRegion(region, for: app)
+            await enforceRegion(region, for: app, gap: gap)
         }
     }
 }

@@ -17,9 +17,14 @@ struct AppConfiguration: Codable, Sendable {
         var focusedWindowBorderColor: String
         var focusedWindowBorderWidth: Double
         var appSwitcherScale: Double
-        
+        /// Gutter in points left around every placed window, applied when a
+        /// region is resolved rather than stored in its geometry. Keeping it out
+        /// of the rectangles is what lets adjacent regions keep exactly shared
+        /// edges. Replaces the per-region padding used before v3.
+        var windowGap: Double
+
         enum CodingKeys: String, CodingKey {
-            case enableAutoProfileSwitch, repositionOnAppLaunch, repositionOnDisplayChange, requireConfirmToLaunchApps, resetWindowShortcut, focusWindowShortcut, showFocusedWindowBorder, focusedWindowBorderColor, focusedWindowBorderWidth, appSwitcherScale
+            case enableAutoProfileSwitch, repositionOnAppLaunch, repositionOnDisplayChange, requireConfirmToLaunchApps, resetWindowShortcut, focusWindowShortcut, showFocusedWindowBorder, focusedWindowBorderColor, focusedWindowBorderWidth, appSwitcherScale, windowGap
         }
         
         init(from decoder: Decoder) throws {
@@ -34,6 +39,7 @@ struct AppConfiguration: Codable, Sendable {
             focusedWindowBorderColor = try container.decodeIfPresent(String.self, forKey: .focusedWindowBorderColor) ?? "#FF6B00"
             focusedWindowBorderWidth = try container.decodeIfPresent(Double.self, forKey: .focusedWindowBorderWidth) ?? 4.0
             appSwitcherScale = try container.decodeIfPresent(Double.self, forKey: .appSwitcherScale) ?? 1.0
+            windowGap = try container.decodeIfPresent(Double.self, forKey: .windowGap) ?? ConfigurationMigration.defaultWindowGap
         }
         
         init(
@@ -46,7 +52,8 @@ struct AppConfiguration: Codable, Sendable {
             showFocusedWindowBorder: Bool = false,
             focusedWindowBorderColor: String = "#FF6B00",
             focusedWindowBorderWidth: Double = 4.0,
-            appSwitcherScale: Double = 1.0
+            appSwitcherScale: Double = 1.0,
+            windowGap: Double = ConfigurationMigration.defaultWindowGap
         ) {
             self.enableAutoProfileSwitch = enableAutoProfileSwitch
             self.repositionOnAppLaunch = repositionOnAppLaunch
@@ -58,6 +65,7 @@ struct AppConfiguration: Codable, Sendable {
             self.focusedWindowBorderColor = focusedWindowBorderColor
             self.focusedWindowBorderWidth = focusedWindowBorderWidth
             self.appSwitcherScale = appSwitcherScale
+            self.windowGap = windowGap
         }
         
         static let `default` = GlobalSettings(

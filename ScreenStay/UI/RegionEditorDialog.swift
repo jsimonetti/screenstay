@@ -16,7 +16,6 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
     private let yField = NSTextField()
     private let widthField = NSTextField()
     private let heightField = NSTextField()
-    private let paddingField = NSTextField()
     private let shortcutRecorder = KeyboardShortcutRecorder()
     private let appsTableView = NSTableView()
     private var appBundleIDs: [String] = []
@@ -132,13 +131,6 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
             yField.widthAnchor.constraint(equalToConstant: 80),
             widthField.widthAnchor.constraint(equalToConstant: 90),
             heightField.widthAnchor.constraint(equalToConstant: 90)
-        ])
-        
-        // Padding
-        addLabeledField(to: stackView, label: "Padding (pixels):", field: paddingField, placeholder: "0")
-        
-        NSLayoutConstraint.activate([
-            paddingField.widthAnchor.constraint(equalToConstant: 100)
         ])
         
         // Keyboard shortcut
@@ -275,7 +267,6 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
         yField.stringValue = "\(Int(frame.origin.y))"
         widthField.stringValue = "\(Int(frame.width))"
         heightField.stringValue = "\(Int(frame.height))"
-        paddingField.stringValue = "\(Int(region.padding))"
 
         if let shortcut = region.keyboardShortcut {
             shortcutRecorder.setShortcut(modifiers: shortcut.modifiers, key: shortcut.key)
@@ -437,8 +428,6 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
             return
         }
         
-        let padding = Double(paddingField.stringValue) ?? 0
-        
         let frame = CGRect(x: x, y: y, width: width, height: height)
         
         // Get keyboard shortcut
@@ -459,7 +448,6 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
             relativeFrame: frame,
             assignedApps: appBundleIDs.filter { !$0.isEmpty },
             keyboardShortcut: shortcut,
-            padding: padding,
             isFocusRegion: region?.isFocusRegion ?? false
         )
         

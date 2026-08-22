@@ -261,7 +261,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             if let profile = await profileManager?.getProfile(by: profileID) {
                 await profileManager?.setActiveProfile(profile)
-                await windowPositionEnforcer?.enforceAllRegions(profile.regions)
+                let gap = CGFloat(await profileManager?.getConfiguration().globalSettings.windowGap ?? 0)
+                await windowPositionEnforcer?.enforceAllRegions(profile.regions, gap: gap)
                 
                 // Rebuild menu to update checkmarks
                 setupMenuBar()
@@ -276,7 +277,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 
                 // Reapply profile
                 if let profile = await profileManager?.autoSelectProfile() {
-                    await windowPositionEnforcer?.enforceAllRegions(profile.regions)
+                    let gap = CGFloat(await profileManager?.getConfiguration().globalSettings.windowGap ?? 0)
+                    await windowPositionEnforcer?.enforceAllRegions(profile.regions, gap: gap)
                 }
                 
                 // Update keyboard shortcuts with new profile

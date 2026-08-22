@@ -21,7 +21,8 @@
         "option"
       ]
     },
-    "showFocusedWindowBorder" : false
+    "showFocusedWindowBorder" : false,
+    "windowGap" : 3
   },
   "profiles" : [
     {
@@ -75,7 +76,6 @@
             ]
           },
           "name" : "Left Top",
-          "padding" : 3,
           "relativeFrame" : [
             [
               0,
@@ -103,7 +103,6 @@
             ]
           },
           "name" : "Left Bottom",
-          "padding" : 3,
           "relativeFrame" : [
             [
               0,
@@ -134,7 +133,6 @@
             ]
           },
           "name" : "Center",
-          "padding" : 3,
           "relativeFrame" : [
             [
               1138,
@@ -165,7 +163,6 @@
             ]
           },
           "name" : "Right",
-          "padding" : 3,
           "relativeFrame" : [
             [
               3414,
@@ -194,7 +191,6 @@
             ]
           },
           "name" : "MacBook - Fullscreen",
-          "padding" : 0,
           "relativeFrame" : [
             [
               0,
@@ -259,7 +255,6 @@
             ]
           },
           "name" : "Left Top",
-          "padding" : 3,
           "relativeFrame" : [
             [
               0,
@@ -287,7 +282,6 @@
             ]
           },
           "name" : "Left Bottom",
-          "padding" : 3,
           "relativeFrame" : [
             [
               0,
@@ -318,7 +312,6 @@
             ]
           },
           "name" : "Center",
-          "padding" : 3,
           "relativeFrame" : [
             [
               1200,
@@ -349,7 +342,6 @@
             ]
           },
           "name" : "Right",
-          "padding" : 3,
           "relativeFrame" : [
             [
               2000,
@@ -378,7 +370,6 @@
             ]
           },
           "name" : "MacBook - Fullscreen",
-          "padding" : 0,
           "relativeFrame" : [
             [
               0,
@@ -430,7 +421,6 @@
             ]
           },
           "name" : "Left Top",
-          "padding" : 3,
           "relativeFrame" : [
             [
               0,
@@ -458,7 +448,6 @@
             ]
           },
           "name" : "Left Bottom",
-          "padding" : 3,
           "relativeFrame" : [
             [
               0,
@@ -489,7 +478,6 @@
             ]
           },
           "name" : "Center",
-          "padding" : 3,
           "relativeFrame" : [
             [
               0,
@@ -520,7 +508,6 @@
             ]
           },
           "name" : "Right",
-          "padding" : 3,
           "relativeFrame" : [
             [
               0,
@@ -549,7 +536,6 @@
             ]
           },
           "name" : "MacBook - Fullscreen",
-          "padding" : 0,
           "relativeFrame" : [
             [
               0,
@@ -564,5 +550,5 @@
       ]
     }
   ],
-  "version" : "2.0"
+  "version" : "3.0"
 }

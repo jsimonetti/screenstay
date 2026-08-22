@@ -97,9 +97,11 @@ Every region shows a badge with what it carries, for example `4 apps, Ctrl Cmd C
 
 ## Migration
 
-`v2` to `v3`, on load, with a backup written alongside as the v1 migration does. Drop `Region.padding`, add `GlobalSettings.windowGap` defaulting to `3`. Geometry is untouched.
+`v2` to `v3`, on load, with a backup written alongside as the v1 migration does. The backup is named after the version it came from, so a later migration cannot overwrite an earlier snapshot. Drop `Region.padding`, add `GlobalSettings.windowGap`. Geometry is untouched.
 
-Four regions change by a few points as a result: the three focus regions and the two `MacBook - Fullscreen` regions that had `0` gain a 3 point inset, and Ultrawide's `MacBook - Fullscreen` loses 2.
+The new gap is whichever padding value the configuration used most often, so the common case keeps the spacing it had, falling back to `3` when there is nothing to infer from.
+
+Six regions change by a few points as a result. The three focus regions and the three `MacBook - Fullscreen` regions that had `0` gain a 3 point inset, except Ultrawide's `MacBook - Fullscreen`, which had `5` and loses 2.
 
 ## Out of scope for the first version
 

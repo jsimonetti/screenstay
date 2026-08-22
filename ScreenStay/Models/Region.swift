@@ -18,8 +18,12 @@ struct Region: Codable, Identifiable, Sendable {
     var relativeFrame: CGRect
     var assignedApps: [String] // Bundle identifiers like "com.apple.Terminal"
     var keyboardShortcut: KeyboardShortcut?
-    var padding: CGFloat = 0  // Inset in points applied to all four edges
     var isFocusRegion: Bool = false  // Whether this is the focus region for the profile
+
+    /// Per-region padding recorded by configs before v3, when the gutter between
+    /// tiled windows was stored once per region instead of once per app. Read
+    /// during migration to pick the global `windowGap`, then dropped.
+    var legacyPadding: CGFloat?
 
     /// Display ID recorded by v1 configs. Volatile and meaningless across
     /// reboots, so it is read once during migration to work out which display a
@@ -27,7 +31,9 @@ struct Region: Codable, Identifiable, Sendable {
     var legacyDisplayID: CGDirectDisplayID?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, displayKey, relativeFrame, assignedApps, keyboardShortcut, padding, isFocusRegion
+        case id, name, displayKey, relativeFrame, assignedApps, keyboardShortcut, isFocusRegion
+        // pre-v3 only
+        case padding
         // v1 only
         case displayID, frame
     }
@@ -38,7 +44,7 @@ struct Region: Codable, Identifiable, Sendable {
         name = try container.decode(String.self, forKey: .name)
         assignedApps = try container.decode([String].self, forKey: .assignedApps)
         keyboardShortcut = try container.decodeIfPresent(KeyboardShortcut.self, forKey: .keyboardShortcut)
-        padding = try container.decodeIfPresent(CGFloat.self, forKey: .padding) ?? 0
+        legacyPadding = try container.decodeIfPresent(CGFloat.self, forKey: .padding)
         isFocusRegion = try container.decodeIfPresent(Bool.self, forKey: .isFocusRegion) ?? false
 
         displayKey = try container.decodeIfPresent(String.self, forKey: .displayKey)
@@ -66,9 +72,8 @@ struct Region: Codable, Identifiable, Sendable {
         try container.encode(relativeFrame, forKey: .relativeFrame)
         try container.encode(assignedApps, forKey: .assignedApps)
         try container.encodeIfPresent(keyboardShortcut, forKey: .keyboardShortcut)
-        try container.encode(padding, forKey: .padding)
         try container.encode(isFocusRegion, forKey: .isFocusRegion)
-        // legacyDisplayID and the v1 `frame` are intentionally not written back.
+        // legacyPadding, legacyDisplayID and the v1 `frame` are not written back.
     }
 
     init(
@@ -78,7 +83,6 @@ struct Region: Codable, Identifiable, Sendable {
         relativeFrame: CGRect,
         assignedApps: [String] = [],
         keyboardShortcut: KeyboardShortcut? = nil,
-        padding: CGFloat = 0,
         isFocusRegion: Bool = false
     ) {
         self.id = id
@@ -87,8 +91,8 @@ struct Region: Codable, Identifiable, Sendable {
         self.relativeFrame = relativeFrame
         self.assignedApps = assignedApps
         self.keyboardShortcut = keyboardShortcut
-        self.padding = padding
         self.isFocusRegion = isFocusRegion
+        self.legacyPadding = nil
         self.legacyDisplayID = nil
     }
 }

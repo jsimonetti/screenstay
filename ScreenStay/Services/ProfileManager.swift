@@ -36,8 +36,9 @@ actor ProfileManager {
         if let data = try? Data(contentsOf: configURL) {
             do {
                 var config = try JSONDecoder().decode(AppConfiguration.self, from: data)
+                let versionOnDisk = config.version
                 if ConfigurationMigration.migrateIfNeeded(&config) {
-                    Self.backUpConfiguration(at: configURL, data: data)
+                    Self.backUpConfiguration(at: configURL, data: data, fromVersion: versionOnDisk)
                     Self.writeConfiguration(config, to: configURL)
                 }
                 self.configuration = config
@@ -55,9 +56,21 @@ actor ProfileManager {
 
     // MARK: - Migration support
 
-    /// Keep the pre-migration file around; the schema change is not reversible.
-    private static func backUpConfiguration(at url: URL, data: Data) {
-        let backupURL = url.deletingPathExtension().appendingPathExtension("v1.backup.json")
+    /// Keep the pre-migration file around; schema changes are not reversible.
+    ///
+    /// The name carries the version being migrated away from, so a later
+    /// migration cannot overwrite the snapshot an earlier one took. An existing
+    /// backup for the same version is never replaced, since the first one is
+    /// the copy furthest from the current state.
+    private static func backUpConfiguration(at url: URL, data: Data, fromVersion: String) {
+        let suffix = fromVersion.split(separator: ".").first.map(String.init) ?? fromVersion
+        let backupURL = url.deletingPathExtension().appendingPathExtension("v\(suffix).backup.json")
+
+        guard !FileManager.default.fileExists(atPath: backupURL.path) else {
+            log("Keeping existing backup at \(backupURL.path)")
+            return
+        }
+
         do {
             try data.write(to: backupURL)
             log("Backed up pre-migration configuration to \(backupURL.path)")

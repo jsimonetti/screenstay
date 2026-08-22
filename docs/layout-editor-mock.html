@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ScreenStay layout editor - final design mock</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; padding:30px 38px 70px; background:#14121c; color:#cfc9de;
+         font:13px/1.55 ui-sans-serif,-apple-system,system-ui,sans-serif; }
+  h1 { font-size:19px; font-weight:600; color:#efe9fb; margin:0 0 4px; }
+  h2 { font-size:13.5px; font-weight:600; color:#efe9fb; margin:34px 0 8px;
+       padding-bottom:6px; border-bottom:1px solid #2a2440; }
+  .sub  { color:#8b83a3; margin:0 0 22px; max-width:96ch; }
+  .note { color:#8b83a3; max-width:96ch; }
+  code { font:500 11.5px ui-monospace,Menlo,monospace; color:#cbdcff; }
+  .good { color:#9fe0a6; } .bad { color:#ffbcbc; } .warn { color:#ffd7ab; }
+
+  /* ---------------- desktop ---------------- */
+  .desk { position:relative; width:100%; aspect-ratio:6848/1440; user-select:none; }
+  .disp { position:absolute; top:0; overflow:hidden; border-radius:8px;
+          box-shadow:0 14px 44px rgba(0,0,0,.55); }
+  .disp.uw  { left:25.234%; width:74.766%; height:100%;
+    background:radial-gradient(120% 150% at 62% 88%,#f0c98d 0%,#e08fa8 22%,#a86ba8 45%,#5b4a86 70%,#2e2a4d 100%); }
+  .disp.mb  { left:0; width:25.234%; height:77.570%;
+    background:radial-gradient(130% 150% at 40% 90%,#e7b58e 0%,#c481a0 30%,#7a5f9c 62%,#332c52 100%); }
+  .disp::after { content:""; position:absolute; inset:0; pointer-events:none; opacity:.8;
+    background:linear-gradient(to top,#241f3d 0 24%,transparent 24%),
+               linear-gradient(115deg,transparent 46%,#3d3363 46% 57%,transparent 57%); }
+  .dlabel { position:absolute; z-index:9; font:600 10px/1 ui-monospace,Menlo,monospace;
+            color:rgba(255,255,255,.72); background:rgba(0,0,0,.45);
+            padding:4px 7px; border-radius:4px; }
+  /* space below the shorter laptop panel is not addressable */
+  .dead { position:absolute; left:0; top:77.570%; width:25.234%; height:22.430%;
+          border-radius:0 0 8px 8px; background:
+          repeating-linear-gradient(45deg,#1b1826 0 7px,#221d31 7px 14px);
+          border:1px dashed #3a3352; }
+  .deadlabel { position:absolute; left:12.6%; top:88%; transform:translate(-50%,-50%);
+               font:500 10px/1 system-ui,sans-serif; color:#6c6484; }
+
+  /* ---------------- regions ---------------- */
+  .region { position:absolute; z-index:3; border:1px solid rgba(255,255,255,.85);
+            background:rgba(255,255,255,.06); display:grid; place-items:center; }
+  .region .nm  { position:absolute; top:7px; left:9px; font:500 11px/1 system-ui,sans-serif;
+                 color:rgba(255,255,255,.78); text-shadow:0 1px 4px rgba(0,0,0,.85); }
+  .region .dim { font:600 12px/1 ui-monospace,Menlo,monospace; color:#fff;
+                 text-shadow:0 1px 4px rgba(0,0,0,.8); }
+  .region .asg { position:absolute; bottom:7px; left:9px; font:500 10px/1 ui-monospace,Menlo,monospace;
+                 color:rgba(255,255,255,.82); background:rgba(0,0,0,.45);
+                 padding:3px 6px; border-radius:3px; }
+  .region.overlay { z-index:5; border-style:dashed; background:rgba(255,255,255,.11); }
+  .region.target  { z-index:6; border:2px solid #7fb2ff; background:rgba(127,178,255,.16);
+                    box-shadow:0 0 0 1px rgba(0,0,0,.4),0 0 22px rgba(127,178,255,.35); }
+  .pin { position:absolute; top:7px; right:9px; font:600 9.5px/1 system-ui,sans-serif;
+         letter-spacing:.5px; text-transform:uppercase; padding:3px 6px; border-radius:3px;
+         color:#1d1526; background:#ff9d3d; }
+  .handle { position:absolute; z-index:8; background:#fff; width:5px; height:32px; border-radius:99px;
+            transform:translate(-50%,-50%); box-shadow:0 1px 5px rgba(0,0,0,.55); }
+  .handle.h { width:32px; height:5px; }
+  .handle.lone { background:rgba(255,255,255,.42); }
+
+  /* ---------------- menus ---------------- */
+  .menu,.sub-menu { position:absolute; z-index:20; padding:5px; font-size:12.5px;
+    background:rgba(38,34,52,.975); backdrop-filter:blur(18px) saturate(1.4);
+    border:1px solid rgba(255,255,255,.13); border-radius:9px;
+    box-shadow:0 18px 48px rgba(0,0,0,.62); }
+  .menu { min-width:252px; } .sub-menu { min-width:214px; }
+  .menu .hdr { display:flex; justify-content:space-between; gap:14px; padding:6px 10px 7px; color:#efe9fb; font-weight:600; }
+  .menu .hdr .sz { color:#8b83a3; font:500 11px/1.4 ui-monospace,Menlo,monospace; }
+  .mi { display:flex; justify-content:space-between; align-items:center; gap:16px;
+        padding:5px 10px; border-radius:5px; color:#dcd6ea; white-space:nowrap; }
+  .mi .r { color:#7d7595; font:500 11px/1 ui-monospace,Menlo,monospace; }
+  .mi.on { background:#4c6fd4; color:#fff; } .mi.on .r { color:rgba(255,255,255,.82); }
+  .mi.danger { color:#ff9b9b; } .mi.dim { color:#6c6484; }
+  .sep { height:1px; margin:5px 8px; background:rgba(255,255,255,.10); }
+  .check { width:13px; display:inline-block; color:#9fe0a6; }
+  .swb { width:9px; height:9px; border-radius:2px; display:inline-block; margin-right:8px; }
+  .cursor { position:absolute; z-index:30; width:0; height:0; pointer-events:none;
+            border-left:7px solid #fff; border-bottom:11px solid transparent;
+            border-right:5px solid transparent; filter:drop-shadow(0 1px 2px rgba(0,0,0,.85)); }
+
+  /* ---------------- gutter panel ---------------- */
+  .strip { position:relative; width:100%; aspect-ratio:5120/460; border-radius:8px; overflow:hidden;
+           background:linear-gradient(115deg,#4a3d70,#8a5f92 45%,#c98aa0 78%,#e8b98f);
+           box-shadow:0 10px 30px rgba(0,0,0,.45); }
+  .win { position:absolute; z-index:4; background:rgba(120,190,255,.32);
+         border:1px solid rgba(160,215,255,.92); border-radius:2px; }
+  .cap { position:absolute; z-index:9; transform:translate(-50%,-50%); white-space:nowrap;
+         font:600 10px/1 ui-monospace,Menlo,monospace; padding:3px 6px; border-radius:3px;
+         color:#bff0c6; background:rgba(14,38,20,.92); border:1px solid rgba(120,220,140,.45); }
+
+  /* ---------------- dialogs ---------------- */
+  .dlg { width:432px; padding:20px 22px 16px; border-radius:12px; background:#262234;
+         border:1px solid rgba(255,255,255,.12); box-shadow:0 22px 60px rgba(0,0,0,.6); }
+  .dlg h3 { margin:0 0 6px; font-size:13.5px; color:#efe9fb; }
+  .dlg p  { margin:0 0 16px; color:#a49cbb; font-size:12.5px; }
+  .btns { display:flex; gap:8px; justify-content:flex-end; }
+  .btn { padding:5px 14px; border-radius:6px; font-size:12.5px; color:#dcd6ea;
+         background:#332d47; border:1px solid rgba(255,255,255,.14); }
+  .btn.pri { background:#4c6fd4; border-color:#5c7ee0; color:#fff; }
+  .btn.dgr { color:#ff9b9b; }
+  .row { display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start; }
+
+  table { border-collapse:collapse; margin-top:8px; font-size:12.5px; width:100%; }
+  th,td { padding:6px 20px 6px 0; text-align:left; vertical-align:top;
+          border-bottom:1px solid #221d33; }
+  th { color:#efe9fb; font-weight:600; }
+</style>
+</head>
+<body>
+
+<h1>ScreenStay layout editor</h1>
+<p class="sub">
+  Final design mock. Profile <strong>Ultrawide Thuis</strong> with its real regions, drawn across both
+  displays at once. Nothing is implemented yet.
+</p>
+
+<h2>1 &nbsp;The editor spans every display in the profile</h2>
+<div class="desk">
+  <div class="disp mb"></div>
+  <div class="disp uw"></div>
+  <div class="dead"></div>
+  <div class="deadlabel">no display here</div>
+  <div class="dlabel" style="left:9px;top:9px">builtin &middot; 1728&times;1117</div>
+  <div class="dlabel" style="left:25.234%;top:9px;margin-left:9px">ext 5120x1440 &middot; 5120&times;1440</div>
+
+  <!-- builtin -->
+  <div class="region" style="left:0%;top:0%;width:24.825%;height:75%">
+    <span class="nm">MacBook - Fullscreen</span><span class="dim">1700 &times; 1080</span>
+    <span class="asg">2 apps &middot; &#8963;&#8984;B</span>
+  </div>
+
+  <!-- ultrawide -->
+  <div class="region" style="left:25.234%;top:0%;width:16.618%;height:50%">
+    <span class="nm">Left Top</span><span class="dim">1138 &times; 720</span>
+    <span class="asg">1 app &middot; &#8963;&#8984;Z</span>
+  </div>
+  <div class="region" style="left:25.234%;top:51.736%;width:16.618%;height:47.222%">
+    <span class="nm">Left Bottom</span><span class="dim">1138 &times; 680</span>
+    <span class="asg">1 app &middot; &#8963;&#8984;X</span>
+  </div>
+  <div class="region" style="left:41.851%;top:0%;width:33.236%;height:98.056%">
+    <span class="nm">Center</span><span class="dim">2276 &times; 1412</span>
+    <span class="asg">4 apps &middot; &#8963;&#8984;C</span>
+  </div>
+  <div class="region" style="left:75.088%;top:0%;width:24.912%;height:98.056%">
+    <span class="nm">Right</span><span class="dim">1706 &times; 1412</span>
+    <span class="asg">4 apps &middot; &#8963;&#8984;V</span>
+  </div>
+  <div class="region overlay" style="left:43.618%;top:3.333%;width:29.790%;height:94.444%">
+    <span class="nm">Focus</span><span class="pin">focus region</span>
+    <span class="dim">2040 &times; 1360</span>
+    <span class="asg">no apps &middot; no shortcut</span>
+  </div>
+
+  <!-- linked handles on the two exactly shared edges -->
+  <div class="handle" style="left:41.851%;top:76%"></div>
+  <div class="handle" style="left:75.088%;top:76%"></div>
+  <!-- lone handles either side of the real 25px gap in the left column -->
+  <div class="handle h lone" style="left:33.5%;top:50%"></div>
+  <div class="handle h lone" style="left:33.5%;top:51.736%"></div>
+</div>
+<p class="note" style="margin-top:12px">
+  One borderless overlay per display, sharing a single undo stack and one key handler. The hatched
+  area is outside every display, so a region dragged there snaps back to the display it came from.
+  <strong>Focus</strong> overlaps <strong>Center</strong> by 2.77&nbsp;M&nbsp;px and simply sits above it.
+  Solid white handles mark the two exactly shared edges; the dim pair in the left column flank your real
+  25&nbsp;px gap, which is left exactly as you set it.
+</p>
+
+<h2>2 &nbsp;Right click drives every discrete action</h2>
+<div style="position:relative;height:400px;background:#1b1826;border:1px solid #2a2440;border-radius:10px;overflow:hidden">
+  <div class="menu" style="left:26px;top:20px">
+    <div class="hdr"><span>Focus</span><span class="sz">2040 &times; 1360</span></div>
+    <div class="sep"></div>
+    <div class="mi on"><span>Select Region</span><span class="r">&#9656;</span></div>
+    <div class="sep"></div>
+    <div class="mi"><span>New Region Here</span><span class="r">600 &times; 400</span></div>
+    <div class="mi"><span>Split into Columns</span><span class="r">1020 | 1020</span></div>
+    <div class="mi"><span>Split into Rows</span><span class="r">680 | 680</span></div>
+    <div class="sep"></div>
+    <div class="mi"><span>Snap Edge</span><span class="r">&#9656;</span></div>
+    <div class="sep"></div>
+    <div class="mi"><span>Rename&hellip;</span></div>
+    <div class="mi"><span>Assign Apps&hellip;</span><span class="r">0</span></div>
+    <div class="mi"><span>Assign Shortcut&hellip;</span><span class="r">none</span></div>
+    <div class="mi"><span><span class="check">&#10003;</span>Focus Region</span></div>
+    <div class="sep"></div>
+    <div class="mi dim"><span>Bring to Front</span><span class="r">already front</span></div>
+    <div class="mi"><span>Send to Back</span></div>
+    <div class="sep"></div>
+    <div class="mi danger"><span>Delete Region</span></div>
+  </div>
+
+  <div class="sub-menu" style="left:290px;top:36px">
+    <div class="mi on"><span><span class="swb" style="background:#7fb2ff"></span>Focus</span><span class="r">top</span></div>
+    <div class="mi"><span><span class="swb" style="background:rgba(255,255,255,.75)"></span>Center</span><span class="r">4 apps</span></div>
+  </div>
+
+  <div class="sub-menu" style="left:290px;top:150px">
+    <div class="mi dim" style="justify-content:flex-start">Snap Edge</div>
+    <div class="mi"><span>Left</span><span class="r">&rarr; Center 1138</span></div>
+    <div class="mi"><span>Right</span><span class="r">&rarr; Right 3414</span></div>
+    <div class="mi"><span>Top</span><span class="r">&rarr; display 0</span></div>
+    <div class="mi"><span>Bottom</span><span class="r">&rarr; display 1440</span></div>
+  </div>
+
+  <div class="menu" style="left:540px;top:20px">
+    <div class="hdr"><span>No region</span><span class="sz">at 2480, 910</span></div>
+    <div class="sep"></div>
+    <div class="mi"><span>New Region Here</span><span class="r">600 &times; 400</span></div>
+    <div class="sep"></div>
+    <div class="mi dim"><span>Paste Region</span></div>
+  </div>
+
+  <p class="note" style="position:absolute;left:540px;top:150px;margin:0;max-width:40ch">
+    The header always names what the menu will act on, which matters when regions stack.
+    <br><br>
+    <strong>Select Region</strong> lists everything under the pointer, topmost first, so a region buried
+    under a full-screen one is still reachable.
+    <br><br>
+    Moving, resizing and drawing stay on the pointer and never appear in the menu.
+  </p>
+</div>
+
+<h2>3 &nbsp;One global gutter, applied at placement</h2>
+<div class="strip">
+  <div class="region" style="left:0%;top:0%;width:22.227%;height:100%"><span class="dim">Left</span></div>
+  <div class="region" style="left:22.227%;top:0%;width:44.453%;height:100%"><span class="dim">Center</span></div>
+  <div class="region" style="left:66.680%;top:0%;width:33.320%;height:100%"><span class="dim">Right</span></div>
+  <div class="win" style="left:0.6%;top:5%;width:21.1%;height:90%"></div>
+  <div class="win" style="left:22.8%;top:5%;width:43.3%;height:90%"></div>
+  <div class="win" style="left:67.3%;top:5%;width:32.1%;height:90%"></div>
+  <div class="handle" style="left:22.227%;top:50%"></div>
+  <div class="handle" style="left:66.680%;top:50%"></div>
+  <div class="cap" style="left:22.227%;top:20%">edges still exactly 3414</div>
+</div>
+<p class="note" style="margin-top:12px">
+  Region rectangles (white) tile exactly and keep their shared edges, so the linked handles survive.
+  <code>windowGap</code> is one number in global settings and is applied to the placed window (blue) at
+  runtime, not stored in the geometry. Overlay regions ignore it, matching the <code>padding: 0</code> you
+  already set on every <em>Focus</em> region by hand. Gutter exaggerated 8&times; here.
+</p>
+
+<h2>4 &nbsp;Leaving, and profiles whose hardware is absent</h2>
+<div class="row">
+  <div class="dlg">
+    <h3>Save changes to &ldquo;Ultrawide Thuis&rdquo;?</h3>
+    <p>You resized 2 regions, added 1 and deleted 1. Deleting <strong>Left Bottom</strong> also removed
+       1&nbsp;app assignment and the shortcut&nbsp;&#8963;&#8984;X.</p>
+    <div class="btns">
+      <span class="btn dgr">Discard</span><span class="btn">Cancel</span><span class="btn pri">Save</span>
+    </div>
+  </div>
+  <div class="dlg">
+    <h3>Can&rsquo;t open the layout editor for &ldquo;AppleTV&rdquo;</h3>
+    <p>This profile needs a display that isn&rsquo;t connected:<br>
+       <strong>1920&times;1080 external</strong>.<br><br>
+       Connect it and try again, or use <em>Capture Current Displays</em> to point this profile at the
+       displays you have.</p>
+    <div class="btns"><span class="btn">OK</span></div>
+  </div>
+</div>
+
+<h2>5 &nbsp;Settled behaviour</h2>
+<table>
+  <tr><th style="width:210px">Area</th><th>Decision</th></tr>
+  <tr><td>Launch</td><td>Profiles tab, with a profile selected. Old region editor stays untouched during development.</td></tr>
+  <tr><td>Scope</td><td>One overlay per display in the profile, all live at once, shared undo stack.</td></tr>
+  <tr><td>Unavailable hardware</td><td>Refuse with the missing displays named. Any successful profile match counts, not just exact identity.</td></tr>
+  <tr><td>Model</td><td>Flat list of free rectangles, unchanged. Any number may overlap.</td></tr>
+  <tr><td>Z-order</td><td>Array order. <code>Bring to Front</code> / <code>Send to Back</code>. No schema change; runtime is unaffected.</td></tr>
+  <tr><td>Handles</td><td>Derived, not structural. Coincident edges get one linked handle; lone edges get a dim one.</td></tr>
+  <tr><td>Pointer</td><td>Drag inside to move, drag edge or handle to resize, drag empty space to draw.</td></tr>
+  <tr><td>Menu</td><td>Every discrete action. Header names the target region.</td></tr>
+  <tr><td>Split</td><td><code>Split into Columns</code> / <code>Split into Rows</code>, always 50/50. Top-left keeps id, name, apps, shortcut.</td></tr>
+  <tr><td>Gutter</td><td>Per-region <code>padding</code> removed. One global <code>windowGap</code>, applied at placement, ignored by overlays.</td></tr>
+  <tr><td>Snapping</td><td>No auto-tidy on open. <code>Snap Edge</code> is the explicit way to create shared edges. Drag-time snapping deferred.</td></tr>
+  <tr><td>Safety</td><td>Assignment badge on every region. <code>&#8984;Z</code> / <code>&#8679;&#8984;Z</code>. <code>&#9099;</code> prompts, naming what would be lost.</td></tr>
+  <tr><td>Migration</td><td>v2 &rarr; v3: drop <code>Region.padding</code>, set <code>GlobalSettings.windowGap = 3</code>. Geometry untouched.</td></tr>
+</table>
+
+</body>
+</html>

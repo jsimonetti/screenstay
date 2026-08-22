@@ -26,10 +26,7 @@ final class LayoutEditorOverlayWindow: NSWindow {
             defer: false
         )
 
-        // Above the menu bar and the Dock, so the editor really does cover the
-        // display. Escape always closes, and the controller tears every overlay
-        // down together, so there is no way to be left stuck behind one.
-        level = .screenSaver
+        level = Self.overlayLevel
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
@@ -43,6 +40,14 @@ final class LayoutEditorOverlayWindow: NSWindow {
         canvas.autoresizingMask = [.width, .height]
         contentView = canvas
     }
+
+    /// Above the Dock (20) and the menu bar (24), so the editor really does
+    /// cover the display, but below pop-up menus (101) so the context menu
+    /// draws on top of it rather than behind.
+    ///
+    /// Modal alerts sit lower still, at 8, so the controller drops the overlays
+    /// while one is up. See `LayoutEditorController.runModal`.
+    static let overlayLevel = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
 
     /// Sit exactly on the display, menu bar included. The default implementation
     /// pushes windows clear of the menu bar, which would leave a strip of the

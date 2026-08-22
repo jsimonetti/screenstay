@@ -40,6 +40,8 @@ final class LayoutEditorController {
     private var localKeyMonitor: Any?
     private var globalKeyMonitor: Any?
     private var displayChangeObserver: NSObjectProtocol?
+    private var undoStack: [[Region]] = []
+    private var redoStack: [[Region]] = []
 
     /// Called with the edited regions when a session is saved.
     var onSave: ((_ profileID: String, _ regions: [Region]) -> Void)?
@@ -81,6 +83,9 @@ final class LayoutEditorController {
             regions: bound.regions
         )
 
+        undoStack.removeAll()
+        redoStack.removeAll()
+
         presentOverlays(for: bound)
         startKeyMonitor()
         startDisplayChangeObserver()
@@ -96,6 +101,9 @@ final class LayoutEditorController {
         for display in DisplayRegistry.shared.displays where keysInProfile.contains(display.key) {
             let overlay = LayoutEditorOverlayWindow(display: display, profileName: profile.name)
             overlay.canvas.regions = profile.regions.filter { $0.displayKey == display.key }
+            overlay.canvas.onContextMenu = { [weak self] point, display, event, view in
+                self?.showContextMenu(atRelative: point, on: display, event: event, in: view)
+            }
             overlay.orderFrontRegardless()
             overlays.append(overlay)
         }
@@ -105,6 +113,73 @@ final class LayoutEditorController {
         let pointer = CoordinateSpace.cocoaToAX(NSEvent.mouseLocation)
         let preferred = overlays.first { $0.display.axBounds.contains(pointer) } ?? overlays.first
         preferred?.makeKey()
+    }
+
+    // MARK: - Editing
+
+    /// The working copy the menu acts on.
+    var currentRegions: [Region] { session?.regions ?? [] }
+
+    /// The canvas showing a given display, if the session has one.
+    func canvas(for display: DisplayRegistry.ResolvedDisplay) -> LayoutEditorCanvasView? {
+        overlays.first { $0.display.key == display.key }?.canvas
+    }
+
+    /// Apply an edit, recording it for undo and redrawing every overlay.
+    func mutate(_ description: String, _ body: (inout [Region]) -> Void) {
+        guard var session else { return }
+
+        let before = session.regions
+        body(&session.regions)
+        guard session.regions != before else { return }
+
+        undoStack.append(before)
+        redoStack.removeAll()
+        self.session = session
+        refreshCanvases()
+        log("Layout editor: \(description)")
+    }
+
+    func undo() {
+        guard var session, let previous = undoStack.popLast() else { return }
+        redoStack.append(session.regions)
+        session.regions = previous
+        self.session = session
+        refreshCanvases()
+        log("Layout editor: undo")
+    }
+
+    func redo() {
+        guard var session, let next = redoStack.popLast() else { return }
+        undoStack.append(session.regions)
+        session.regions = next
+        self.session = session
+        refreshCanvases()
+        log("Layout editor: redo")
+    }
+
+    private func refreshCanvases() {
+        for overlay in overlays {
+            overlay.canvas.regions = currentRegions.filter { $0.displayKey == overlay.display.key }
+        }
+    }
+
+    /// Run a modal alert with the overlays dropped out of the way.
+    ///
+    /// Alerts sit at window level 8 and the overlays at 26, so without this the
+    /// alert would be presented behind them and the app would look frozen.
+    @discardableResult
+    func runModal<T>(_ body: () -> T) -> T {
+        let saved = overlays.map(\.level)
+        for overlay in overlays {
+            overlay.level = .normal
+        }
+        defer {
+            for (overlay, level) in zip(overlays, saved) {
+                overlay.level = level
+            }
+        }
+        return body()
     }
 
     // MARK: - Closing
@@ -158,7 +233,7 @@ final class LayoutEditorController {
         alert.addButton(withTitle: "Cancel")
         alert.addButton(withTitle: "Discard")
 
-        switch alert.runModal() {
+        switch runModal({ alert.runModal() }) {
         case .alertFirstButtonReturn: return .save
         case .alertThirdButtonReturn: return .discard
         default: return .cancel
@@ -272,12 +347,12 @@ final class LayoutEditorController {
         }
 
         if modifiers == [.command], event.charactersIgnoringModifiers == "z" {
-            log("Layout editor: undo requested (no history yet)")
+            undo()
             return true
         }
 
         if modifiers == [.command, .shift], event.charactersIgnoringModifiers?.lowercased() == "z" {
-            log("Layout editor: redo requested (no history yet)")
+            redo()
             return true
         }
 

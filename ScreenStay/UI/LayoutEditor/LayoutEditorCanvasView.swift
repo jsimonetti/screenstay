@@ -11,6 +11,11 @@ final class LayoutEditorCanvasView: NSView {
     var display: DisplayRegistry.ResolvedDisplay?
     var profileName: String = ""
 
+    /// Right click, reported with the pointer already converted to a
+    /// display-relative point in AX orientation, which is how regions are stored.
+    var onContextMenu: ((_ relativePoint: CGPoint, _ display: DisplayRegistry.ResolvedDisplay,
+                         _ event: NSEvent, _ view: LayoutEditorCanvasView) -> Void)?
+
     /// Regions belonging to this display, in z-order, bottom first.
     var regions: [Region] = [] {
         didSet { needsDisplay = true }
@@ -56,6 +61,36 @@ final class LayoutEditorCanvasView: NSView {
         let displayOrigin = CoordinateSpace.axToCocoa(display.axBounds).origin
         return CoordinateSpace.axToCocoa(absoluteAX)
             .offsetBy(dx: -displayOrigin.x, dy: -displayOrigin.y)
+    }
+
+    /// The inverse of `viewRect` for a point: view coordinates back to a
+    /// display-relative point in AX orientation.
+    static func relativePoint(
+        forViewPoint point: CGPoint,
+        on display: DisplayRegistry.ResolvedDisplay
+    ) -> CGPoint {
+        let displayOrigin = CoordinateSpace.axToCocoa(display.axBounds).origin
+        let globalCocoa = CGPoint(x: displayOrigin.x + point.x, y: displayOrigin.y + point.y)
+        let ax = CoordinateSpace.cocoaToAX(globalCocoa)
+        return CGPoint(x: ax.x - display.axBounds.minX, y: ax.y - display.axBounds.minY)
+    }
+
+    // MARK: - Mouse
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard let display else { return }
+        let viewPoint = convert(event.locationInWindow, from: nil)
+        onContextMenu?(Self.relativePoint(forViewPoint: viewPoint, on: display), display, event, self)
+    }
+
+    /// Control-click is the system contextual menu gesture, so route it the same
+    /// way rather than letting it arrive as an ordinary click.
+    override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.control) {
+            rightMouseDown(with: event)
+            return
+        }
+        super.mouseDown(with: event)
     }
 
     private func draw(_ region: Region, on display: DisplayRegistry.ResolvedDisplay) {

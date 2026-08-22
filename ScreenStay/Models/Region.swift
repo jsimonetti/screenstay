@@ -8,7 +8,7 @@ import CoreGraphics
 /// is deliberately not absolute - absolute coordinates depend on which monitor
 /// is primary and on how the displays are arranged, so they break as soon as
 /// anything moves. Use `RegionGeometry` to resolve a region to real coordinates.
-struct Region: Codable, Identifiable, Sendable {
+struct Region: Codable, Identifiable, Sendable, Equatable {
     let id: String
     var name: String
     /// Stable key of the display this region lives on, see `DisplayIdentity`.
@@ -98,7 +98,7 @@ struct Region: Codable, Identifiable, Sendable {
 }
 
 /// Keyboard shortcut configuration
-struct KeyboardShortcut: Codable, Sendable {
+struct KeyboardShortcut: Codable, Sendable, Equatable {
     var modifiers: [String] // ["cmd", "shift", "option", "control"]
     var key: String // Single character or special key name
 

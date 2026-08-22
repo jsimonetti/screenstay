@@ -236,8 +236,9 @@ class EventCoordinator: ObservableObject {
         DisplayRegistry.shared.refresh()
         borderOverlay.invalidateScreenCache()
 
-        // Clear any focused window since display topology changed
-        focusRegionManager.clearFocus()
+        // Put a focused window back where it came from if that is still
+        // somewhere visible, rather than abandoning it in the focus region.
+        focusRegionManager.handleDisplayChange()
 
         // Reset window tracking since display topology changed
         windowEventMonitor.resetPositionedWindows()

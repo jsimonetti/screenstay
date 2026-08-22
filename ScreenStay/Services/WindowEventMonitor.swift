@@ -6,10 +6,33 @@ import AppKit
 @MainActor
 class WindowEventMonitor {
     
-    private var observers: [pid_t: AXObserver] = [:]
+    /// Observer per process, with the bundle identifier it was created for.
+    ///
+    /// The identifier is kept because macOS recycles process IDs. Without it a
+    /// new app inheriting a dead one's PID looks like an existing observer and
+    /// is never watched.
+    private var observers: [pid_t: (observer: AXObserver, bundleID: String)] = [:]
     private var monitoredBundleIDs: Set<String> = [] // Apps assigned to regions (for window creation)
-    private var positionedWindows: Set<CGWindowID> = []
-    private var isRepositioning = false
+
+    /// Windows already placed, remembered with their owning process.
+    ///
+    /// `CGWindowID` is 32 bits and gets reused. Keyed by ID alone, a recycled
+    /// value makes a genuinely new window look already positioned, and it is
+    /// then silently skipped. Pairing with the PID makes that far less likely,
+    /// and the set is pruned so it cannot grow without bound.
+    private var positionedWindows: [CGWindowID: pid_t] = [:]
+
+    /// Depth of in-flight repositioning, not a flag.
+    ///
+    /// Repositioning happens per app in sequence and each one clears itself
+    /// after a delay, so a single boolean gets cleared by an earlier call while
+    /// a later one is still running.
+    private var repositioningDepth = 0
+
+    /// Prune the positioned set once it passes this, measured against the
+    /// windows actually on screen.
+    private static let positionedWindowsPruneThreshold = 256
+
     private let accessibilityService: AccessibilityService
     
     var onWindowEvent: ((NSRunningApplication, AXUIElement, String) -> Void)?
@@ -34,8 +57,8 @@ class WindowEventMonitor {
     
     /// Stop monitoring all windows
     func stopMonitoring() {
-        for (_, observer) in observers {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+        for (_, entry) in observers {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(entry.observer), .commonModes)
         }
         observers.removeAll()
         monitoredBundleIDs.removeAll()
@@ -57,126 +80,147 @@ class WindowEventMonitor {
     
     /// Remove observer when app terminates
     func removeObserver(for app: NSRunningApplication) async {
-        if let observer = observers.removeValue(forKey: app.processIdentifier) {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+        let pid = app.processIdentifier
+        if let entry = observers.removeValue(forKey: pid) {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(entry.observer), .commonModes)
         }
-        
-        // Clean up window IDs for this app
-        // Note: We can't easily know which windows belong to which app,
-        // so we'll let the set grow until profile changes (acceptable)
+
+        // Now that positioned windows record their owner, the dead app's
+        // entries can go, which is most of what kept the set growing.
+        positionedWindows = positionedWindows.filter { $0.value != pid }
     }
     
     /// Mark that we are about to reposition a window (to ignore subsequent events)
     func willRepositionWindow() {
-        isRepositioning = true
+        repositioningDepth += 1
     }
-    
+
     /// Mark that we finished repositioning
     func didRepositionWindow() {
-        // Small delay to ensure any triggered events are processed before we clear the flag
-        Task {
+        // Small delay so any events the move triggered arrive while still suppressed.
+        Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(100))
-            isRepositioning = false
+            repositioningDepth = max(0, repositioningDepth - 1)
         }
     }
     
     /// Mark a window as positioned (either by us or by user)
     func markWindowAsPositioned(_ window: AXUIElement) {
-        if let windowID = accessibilityService.getWindowID(window) {
-            positionedWindows.insert(windowID)
+        guard let windowID = accessibilityService.getWindowID(window),
+              let pid = accessibilityService.getPID(window) else {
+            return
         }
+        positionedWindows[windowID] = pid
+        prunePositionedWindowsIfNeeded()
     }
-    
+
     /// Remove a window from the positioned set (to allow repositioning)
     func removeWindowFromPositioned(_ window: AXUIElement) {
         if let windowID = accessibilityService.getWindowID(window) {
-            positionedWindows.remove(windowID)
+            positionedWindows.removeValue(forKey: windowID)
         }
     }
-    
+
     /// Check if we've already positioned this window
     func hasPositionedWindow(_ window: AXUIElement) -> Bool {
-        guard let windowID = accessibilityService.getWindowID(window) else {
+        guard let windowID = accessibilityService.getWindowID(window),
+              let pid = accessibilityService.getPID(window) else {
             return false
         }
-        return positionedWindows.contains(windowID)
+        // Same ID but a different owner means the ID was recycled.
+        return positionedWindows[windowID] == pid
     }
-    
+
     /// Reset all positioned window tracking (e.g., when profile changes)
     func resetPositionedWindows() {
         positionedWindows.removeAll()
+    }
+
+    /// Drop entries for windows that are no longer on screen.
+    private func prunePositionedWindowsIfNeeded() {
+        guard positionedWindows.count > Self.positionedWindowsPruneThreshold else { return }
+
+        guard let windowList = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+            return
+        }
+        let live = Set(windowList.compactMap { $0[kCGWindowNumber as String] as? CGWindowID })
+
+        let before = positionedWindows.count
+        positionedWindows = positionedWindows.filter { live.contains($0.key) }
+        log("Pruned positioned window tracking: \(before) -> \(positionedWindows.count)")
     }
     
     // MARK: - Private Implementation
     
     private func createObserver(for app: NSRunningApplication, monitorCreation: Bool) {
         let pid = app.processIdentifier
-        
-        // Don't create duplicate observers
-        guard observers[pid] == nil else { return }
-        
+        guard let bundleID = app.bundleIdentifier else { return }
+
+        if let existing = observers[pid] {
+            // Same process, already watched.
+            guard existing.bundleID != bundleID else { return }
+            // Different app on a recycled PID: the old observer is dead weight
+            // and would otherwise block this app from ever being watched.
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(existing.observer), .commonModes)
+            observers.removeValue(forKey: pid)
+            log("Reusing recycled PID \(pid): \(existing.bundleID) -> \(bundleID)")
+        }
+
         let appElement = AXUIElementCreateApplication(pid)
         var observer: AXObserver?
-        
-        // Create a context struct to pass both monitor and pid
-        struct ObserverContext {
-            let monitor: Unmanaged<WindowEventMonitor>
-            let pid: pid_t
-        }
-        
+
+        // The PID is read back from the element rather than carried in a context
+        // struct. The struct had to be heap allocated per observer and was only
+        // freed on the failure path, so every observed app leaked one.
         let callback: AXObserverCallback = { _, element, notification, refcon in
-            guard let refcon = refcon else { return }
-            let context = refcon.load(as: ObserverContext.self)
-            let monitor = context.monitor.takeUnretainedValue()
-            let pid = context.pid
-            
+            guard let refcon else { return }
+            let monitor = Unmanaged<WindowEventMonitor>.fromOpaque(refcon).takeUnretainedValue()
+
+            var elementPID: pid_t = 0
+            guard AXUIElementGetPid(element, &elementPID) == .success else { return }
+
             Task { @MainActor in
                 monitor.handleWindowEvent(
                     notification: notification as String,
                     element: element,
-                    pid: pid
+                    pid: elementPID
                 )
             }
         }
-        
-        // Create context and pass it as refcon
-        let monitorRef = Unmanaged.passUnretained(self)
-        let context = ObserverContext(monitor: monitorRef, pid: pid)
-        let contextPtr = UnsafeMutablePointer<ObserverContext>.allocate(capacity: 1)
-        contextPtr.initialize(to: context)
-        
-        let result = AXObserverCreate(pid, callback, &observer)
-        
-        guard result == .success, let observer = observer else {
-            contextPtr.deinitialize(count: 1)
-            contextPtr.deallocate()
+
+        guard AXObserverCreate(pid, callback, &observer) == .success, let observer else {
             return
         }
-        
+
+        let refcon = Unmanaged.passUnretained(self).toOpaque()
+
         // Register for focus change events for ALL apps
-        AXObserverAddNotification(observer, appElement, kAXFocusedWindowChangedNotification as CFString, contextPtr)
-        
+        AXObserverAddNotification(observer, appElement, kAXFocusedWindowChangedNotification as CFString, refcon)
+
         // Only register for window creation if app is assigned to a region
         if monitorCreation {
-            AXObserverAddNotification(observer, appElement, kAXWindowCreatedNotification as CFString, contextPtr)
+            AXObserverAddNotification(observer, appElement, kAXWindowCreatedNotification as CFString, refcon)
         }
-        
-        // Add to run loop
-        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
-        
-        observers[pid] = observer
+
+        // commonModes, not defaultMode. In defaultMode these callbacks stop
+        // arriving while a menu is open or a drag is in progress, which is
+        // exactly when windows are being created and focus is changing.
+        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+
+        observers[pid] = (observer, bundleID)
     }
-    
+
     private func handleWindowEvent(notification: String, element: AXUIElement, pid: pid_t) {
-        // Find the app
-        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.processIdentifier == pid }) else {
+        // Direct lookup. Scanning runningApplications ran on every focus change.
+        guard let app = NSRunningApplication(processIdentifier: pid) else {
             return
         }
         
         // Handle window creation events
         if notification == kAXWindowCreatedNotification as String {
-            // Ignore if we're currently repositioning
-            if isRepositioning {
+            // Ignore anything triggered by our own repositioning.
+            if repositioningDepth > 0 {
                 return
             }
             

@@ -15,13 +15,16 @@ actor FocusCycleController {
     @MainActor
     private var eventMonitor: Any?
     @MainActor
+    private var localEventMonitor: Any?
+    @MainActor
+    private var switcherTimeout: Task<Void, Never>?
+    @MainActor
     private var switcherWindow: AppSwitcherWindow?
     
     struct SwitcherState {
         let region: Region
         let apps: [(bundleID: String, name: String, isRunning: Bool)]
         var selectedIndex: Int
-        let startTime: Date
     }
     
     init(windowOrderService: WindowOrderService, profileManager: ProfileManager) {
@@ -68,8 +71,7 @@ actor FocusCycleController {
         let state = SwitcherState(
             region: region,
             apps: apps,
-            selectedIndex: initialIndex,
-            startTime: Date()
+            selectedIndex: initialIndex
         )
         switcherState = state
         
@@ -148,31 +150,80 @@ actor FocusCycleController {
     }
     
     /// Start monitoring for modifier key release
+    ///
+    /// Two monitors, not one. A global monitor only sees events dispatched to
+    /// *other* applications, so as soon as ScreenStay itself is active - which
+    /// it is whenever the Settings window is open - the modifier release never
+    /// arrives and the switcher hangs with no way to commit or dismiss it.
     @MainActor
     private func startModifierMonitoring() async {
-        // Remove existing monitor if any
-        if let monitor = self.eventMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-        
-        let monitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            Task { @MainActor in
-                guard let self = self else { return }
-                
-                // Check if all modifiers are released
-                let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-                let hasModifiers = modifiers.contains(.command) || modifiers.contains(.control) || 
-                                   modifiers.contains(.option) || modifiers.contains(.shift)
-                
-                if !hasModifiers {
-                    await self.commitSelection()
-                }
+        stopModifierMonitoring()
+
+        let onFlagsChanged: @MainActor (NSEvent) -> Void = { [weak self] event in
+            guard let self else { return }
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            let held = modifiers.contains(.command) || modifiers.contains(.control)
+                || modifiers.contains(.option) || modifiers.contains(.shift)
+            if !held {
+                Task { await self.commitSelection() }
             }
         }
-        
-        eventMonitor = monitor
+
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { event in
+            Task { @MainActor in onFlagsChanged(event) }
+        }
+
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+            MainActor.assumeIsolated { onFlagsChanged(event) }
+            return event
+        }
+
+        startSwitcherTimeout()
     }
-    
+
+    /// Commit anyway if the modifiers are never seen going up.
+    ///
+    /// A quick enough tap releases them before the monitors are installed, and
+    /// nothing would arrive to close the switcher.
+    @MainActor
+    private func startSwitcherTimeout() {
+        switcherTimeout?.cancel()
+        switcherTimeout = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(Self.switcherTimeout))
+            guard !Task.isCancelled, self.switcherState != nil else { return }
+
+            // If the modifiers really are still down the user is still choosing,
+            // so only give up when nothing is held.
+            let held = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            let stillHolding = held.contains(.command) || held.contains(.control)
+                || held.contains(.option) || held.contains(.shift)
+            if stillHolding {
+                self.startSwitcherTimeout()
+                return
+            }
+
+            log("App switcher timed out with no modifier release; committing")
+            await self.commitSelection()
+        }
+    }
+
+    @MainActor
+    private func stopModifierMonitoring() {
+        if let eventMonitor {
+            NSEvent.removeMonitor(eventMonitor)
+        }
+        if let localEventMonitor {
+            NSEvent.removeMonitor(localEventMonitor)
+        }
+        eventMonitor = nil
+        localEventMonitor = nil
+        switcherTimeout?.cancel()
+        switcherTimeout = nil
+    }
+
+    /// How long to wait for a modifier release before assuming it was missed.
+    private static let switcherTimeout: Double = 2
+
     /// Activate the selected app and hide switcher
     @MainActor
     private func commitSelection() async {
@@ -183,12 +234,8 @@ actor FocusCycleController {
         // Hide switcher
         switcherWindow?.hide()
         switcherState = nil
-        
-        // Remove event monitor
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
-        }
+
+        stopModifierMonitoring()
         
         // Activate or launch the app
         await activateApp(selectedApp.bundleID, launchIfNeeded: !selectedApp.isRunning)

@@ -236,8 +236,10 @@ class FocusedWindowBorderOverlay {
         AXObserverAddNotification(observer, window, kAXWindowMiniaturizedNotification as CFString, Unmanaged.passUnretained(self).toOpaque())
         AXObserverAddNotification(observer, window, kAXWindowDeminiaturizedNotification as CFString, Unmanaged.passUnretained(self).toOpaque())
         
-        // Start observing
-        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+        // commonModes, not defaultMode: in defaultMode these stop arriving
+        // during a drag, so the border does not follow a window being moved,
+        // which is the moment it most obviously should.
+        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
         
         self.axObserver = observer
     }
@@ -246,7 +248,7 @@ class FocusedWindowBorderOverlay {
         guard let observer = axObserver else { return }
         
         // Remove from run loop
-        CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+        CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
         
         axObserver = nil
     }

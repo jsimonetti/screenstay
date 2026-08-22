@@ -26,32 +26,53 @@ class AccessibilityService {
     /// Get the frontmost window of an application
     func getFrontmostWindow(for app: NSRunningApplication) -> AXUIElement? {
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        
+
         var windowValue: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &windowValue)
-        
-        guard result == .success, let window = windowValue else {
-            // Fallback: try to get any window
-            return getFirstWindow(for: app)
+
+        // The value comes from another process, so check the type rather than
+        // force casting it.
+        if result == .success, let value = windowValue,
+           CFGetTypeID(value) == AXUIElementGetTypeID() {
+            return (value as! AXUIElement)
         }
-        
-        return (window as! AXUIElement)
+
+        return getFirstPlaceableWindow(for: app)
     }
-    
-    /// Get the first window of an application
-    private func getFirstWindow(for app: NSRunningApplication) -> AXUIElement? {
+
+    /// First window of an application that is worth positioning.
+    ///
+    /// Not simply the first window: an app whose main window is hidden can list
+    /// a palette or inspector first, and blindly taking it drags the wrong thing
+    /// into a region.
+    private func getFirstPlaceableWindow(for app: NSRunningApplication) -> AXUIElement? {
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        
+
         var windowsValue: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsValue)
-        
-        guard result == .success,
-              let windows = windowsValue as? [AXUIElement],
-              let firstWindow = windows.first else {
+
+        guard result == .success, let windows = windowsValue as? [AXUIElement] else {
             return nil
         }
-        
-        return firstWindow
+
+        return windows.first { shouldPositionWindow($0) } ?? windows.first
+    }
+
+    /// Process owning a window element.
+    func getPID(_ window: AXUIElement) -> pid_t? {
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(window, &pid) == .success else { return nil }
+        return pid
+    }
+
+    /// Whether a window is currently minimized.
+    func isMinimized(_ window: AXUIElement) -> Bool {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &value) == .success,
+              let number = value as? NSNumber else {
+            return false
+        }
+        return number.boolValue
     }
     
     /// Get window position
@@ -134,72 +155,78 @@ class AccessibilityService {
             return number.uint32Value
         }
         
-        // Fallback: try to match by position and size using CGWindowList
+        // Fallback: match by owning process, position and size.
+        //
+        // The process matters. Matching on bounds alone picks the first window
+        // with those bounds, and identically sized windows are the normal state
+        // in a tiled layout, not an edge case. Even scoped to one process the
+        // match can be ambiguous, in which case returning nothing beats
+        // returning the wrong window: callers treat nil as "not tracked", while
+        // a wrong ID makes a different window look already positioned.
         guard let position = getWindowPosition(window),
-              let size = getWindowSize(window) else {
+              let size = getWindowSize(window),
+              let pid = getPID(window) else {
             return nil
         }
-        
-        // Get window list and find matching window
-        guard let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+
+        guard let windowList = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
             return nil
         }
-        
-        for windowDict in windowList {
-            guard let boundsDict = windowDict[kCGWindowBounds as String] as? [String: CGFloat],
-                  let x = boundsDict["X"],
-                  let y = boundsDict["Y"],
-                  let width = boundsDict["Width"],
-                  let height = boundsDict["Height"] else {
-                continue
+
+        let matches = windowList.filter { windowDict in
+            guard windowDict[kCGWindowOwnerPID as String] as? pid_t == pid,
+                  let boundsDict = windowDict[kCGWindowBounds as String] as? [String: CGFloat],
+                  let x = boundsDict["X"], let y = boundsDict["Y"],
+                  let width = boundsDict["Width"], let height = boundsDict["Height"] else {
+                return false
             }
-            
-            // Match by position and size (within 1px tolerance)
-            if abs(x - position.x) < 1 && abs(y - position.y) < 1 &&
-               abs(width - size.width) < 1 && abs(height - size.height) < 1 {
-                if let id = windowDict[kCGWindowNumber as String] as? CGWindowID {
-                    return id
-                }
-            }
+            return abs(x - position.x) < 1 && abs(y - position.y) < 1
+                && abs(width - size.width) < 1 && abs(height - size.height) < 1
         }
-        
-        return nil
+
+        guard matches.count == 1 else { return nil }
+        return matches[0][kCGWindowNumber as String] as? CGWindowID
     }
     
-    /// Check if a window should be positioned (filters out system dialogs, sheets, etc.)
+    /// Whether a window is an ordinary document window worth positioning.
+    ///
+    /// This asks for `AXStandardWindow` rather than listing things to exclude.
+    /// A denylist positions anything whose subrole nobody thought of, and there
+    /// is no shortage of those; requiring the one subrole that means "ordinary
+    /// window" fails safe instead.
     func shouldPositionWindow(_ window: AXUIElement) -> Bool {
-        // Check subrole - dialogs, sheets, and floating windows should not be positioned
+        placementRefusalReason(for: window) == nil
+    }
+
+    /// Why a window is not a placement target, or nil if it is one.
+    ///
+    /// Split out so the enforcer can say what it skipped. Requiring
+    /// AXStandardWindow is stricter than the denylist it replaced, and the only
+    /// way to find an app it wrongly excludes is to be able to see the refusals.
+    func placementRefusalReason(for window: AXUIElement) -> String? {
+        // A minimized window has a frame, and moving it does nothing visible
+        // except surprise the user when it is restored.
+        if isMinimized(window) {
+            return "minimized"
+        }
+
+        var roleValue: CFTypeRef?
+        if AXUIElementCopyAttributeValue(window, kAXRoleAttribute as CFString, &roleValue) == .success,
+           let role = roleValue as? String, role != kAXWindowRole as String {
+            return "role is \(role)"
+        }
+
         var subroleValue: CFTypeRef?
         let subroleResult = AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &subroleValue)
-        
-        if subroleResult == .success, let subrole = subroleValue as? String {
-            let excludedSubroles = [
-                kAXDialogSubrole as String,          // Standard dialogs (open/save)
-                kAXSystemDialogSubrole as String,    // System-level dialogs
-                kAXFloatingWindowSubrole as String,  // Floating palettes/inspectors
-                kAXSheetRole as String,              // Modal sheets
-                "AXHelpTag",                         // Tooltips
-                "AXPopover",                         // Popover windows
-                "AXMenu",                            // Dropdown/context menus
-                "AXUnknown"                          // Unknown/unclassified windows
-            ]
-            
-            if excludedSubroles.contains(subrole) {
-                return false
-            }
+
+        guard subroleResult == .success, let subrole = subroleValue as? String else {
+            // Some apps report no subrole at all. Their role already said
+            // AXWindow, so allow it rather than refusing to manage the app.
+            return nil
         }
-        
-        // Check role - sheets should never be positioned
-        var roleValue: CFTypeRef?
-        let roleResult = AXUIElementCopyAttributeValue(window, kAXRoleAttribute as CFString, &roleValue)
-        
-        if roleResult == .success, let role = roleValue as? String {
-            if role == kAXSheetRole as String {
-                return false
-            }
-        }
-        
-        return true
+
+        return subrole == kAXStandardWindowSubrole as String ? nil : "subrole is \(subrole)"
     }
 }
 

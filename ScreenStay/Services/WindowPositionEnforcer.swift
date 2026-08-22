@@ -33,8 +33,9 @@ actor WindowPositionEnforcer {
             return
         }
 
-        // Filter out system dialogs, sheets, and floating windows
-        guard accessibilityService.shouldPositionWindow(targetWindow) else {
+        // Filter out anything that is not an ordinary document window
+        if let reason = accessibilityService.placementRefusalReason(for: targetWindow) {
+            log("Not placing a window of \(app.bundleIdentifier ?? "?") in '\(region.name)': \(reason)")
             return
         }
 

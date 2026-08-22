@@ -12,8 +12,8 @@ class FocusRegionManager {
     private var originalFrame: CGRect?
     private var focusRegionFrame: CGRect?  // The frame where window should be when focused
     
-    // Monitor for manual moves
-    private var positionCheckTimer: Timer?
+    // Observer for manual moves, rather than polling for them
+    private var axObserver: AXObserver?
     
     init(accessibilityService: AccessibilityService) {
         self.accessibilityService = accessibilityService
@@ -48,9 +48,9 @@ class FocusRegionManager {
         
         // Move window to focus region
         accessibilityService.setWindowFrame(window, to: targetFrame)
-        
-        // Start monitoring for manual moves
-        startMonitoringPosition()
+
+        // Watch for the user moving it back out
+        startObserving(window)
     }
     
     /// Unfocus the current window (return to original position)
@@ -69,13 +69,40 @@ class FocusRegionManager {
     
     /// Clear focus state without moving window
     func clearFocus() {
-        stopMonitoringPosition()
+        stopObserving()
         focusedWindow = nil
         focusedWindowID = nil
         originalFrame = nil
         focusRegionFrame = nil
     }
     
+    /// Called when the displays change underneath a focused window.
+    ///
+    /// Best effort restore rather than a silent drop. The stored frame may now
+    /// be on a display that is gone, in which case putting the window there
+    /// would hide it, so that case only clears. Previously this always
+    /// discarded the restore point and left the window in the focus region.
+    func handleDisplayChange() {
+        guard let window = focusedWindow, let originalFrame else {
+            clearFocus()
+            return
+        }
+
+        DisplayRegistry.shared.refresh()
+        let stillVisible = DisplayRegistry.shared.displays.contains {
+            $0.axBounds.intersects(originalFrame)
+        }
+
+        if stillVisible {
+            accessibilityService.setWindowFrame(window, to: originalFrame)
+            log("Displays changed: restored the focused window to where it was")
+        } else {
+            log("Displays changed: the focused window's original position is no longer on any display, "
+                + "leaving it where it is")
+        }
+        clearFocus()
+    }
+
     /// Get the currently focused window
     func getFocusedWindow() -> (window: AXUIElement, id: CGWindowID)? {
         guard let window = focusedWindow, let id = focusedWindowID else {
@@ -89,46 +116,80 @@ class FocusRegionManager {
         return focusedWindowID == windowID
     }
     
-    // MARK: - Position Monitoring
-    
-    private func startMonitoringPosition() {
-        stopMonitoringPosition()
-        
-        // Check every 500ms if the focused window was manually moved
-        positionCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.checkFocusedWindowPosition()
+    // MARK: - Watching for manual moves
+
+    /// Observe the window instead of polling it.
+    ///
+    /// This used to poll twice a second for as long as a window was focused,
+    /// which both wasted the wakeups and took up to half a second to notice.
+    /// The border overlay already did it this way.
+    private func startObserving(_ window: AXUIElement) {
+        stopObserving()
+
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(window, &pid) == .success else { return }
+
+        var observer: AXObserver?
+        let callback: AXObserverCallback = { _, _, notification, refcon in
+            guard let refcon else { return }
+            let manager = Unmanaged<FocusRegionManager>.fromOpaque(refcon).takeUnretainedValue()
+            let name = notification as String
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    manager.handleWindowNotification(name)
+                }
             }
         }
-    }
-    
-    private func stopMonitoringPosition() {
-        positionCheckTimer?.invalidate()
-        positionCheckTimer = nil
-    }
-    
-    private func checkFocusedWindowPosition() {
-        guard let window = focusedWindow,
-              let focusRegionFrame = focusRegionFrame else {
-            return
+
+        guard AXObserverCreate(pid, callback, &observer) == .success, let observer else { return }
+
+        let refcon = Unmanaged.passUnretained(self).toOpaque()
+        for notification in [kAXMovedNotification, kAXResizedNotification, kAXUIElementDestroyedNotification] {
+            AXObserverAddNotification(observer, window, notification as CFString, refcon)
         }
-        
-        // Get current position
-        guard let currentPosition = accessibilityService.getWindowPosition(window),
-              let currentSize = accessibilityService.getWindowSize(window) else {
-            // Window might be closed or invalid
+
+        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+        axObserver = observer
+    }
+
+    private func stopObserving() {
+        guard let axObserver else { return }
+        CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(axObserver), .commonModes)
+        self.axObserver = nil
+    }
+
+    private func handleWindowNotification(_ notification: String) {
+        if notification == kAXUIElementDestroyedNotification as String {
             clearFocus()
             return
         }
-        
-        let currentFrame = CGRect(origin: currentPosition, size: currentSize)
-        
-        // Check if window was moved significantly from the focus region (> 10px in any direction)
-        let positionDiff = abs(currentFrame.origin.x - focusRegionFrame.origin.x) + 
-                          abs(currentFrame.origin.y - focusRegionFrame.origin.y)
-        
-        if positionDiff > 10 {
+        checkFocusedWindowFrame()
+    }
+
+    /// Give up the focus state once the user has moved or resized the window
+    /// away from where it was put.
+    private func checkFocusedWindowFrame() {
+        guard let window = focusedWindow, let focusRegionFrame else { return }
+
+        guard let position = accessibilityService.getWindowPosition(window),
+              let size = accessibilityService.getWindowSize(window) else {
+            clearFocus()
+            return
+        }
+
+        // Size counts as well as position. Resizing a window out of its region
+        // used to leave it considered focused.
+        let movedBy = abs(position.x - focusRegionFrame.origin.x)
+            + abs(position.y - focusRegionFrame.origin.y)
+        let resizedBy = abs(size.width - focusRegionFrame.width)
+            + abs(size.height - focusRegionFrame.height)
+
+        if movedBy > Self.driftTolerance || resizedBy > Self.driftTolerance {
             clearFocus()
         }
     }
+
+    /// How far a window may drift before it stops counting as focused. Apps
+    /// nudge their own frames by a point or two, so this is not zero.
+    private static let driftTolerance: CGFloat = 10
 }

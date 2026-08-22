@@ -322,7 +322,7 @@ private final class ShortcutSheetController: NSObject {
         self.result = shortcut
 
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 190),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 210),
             styleMask: [.titled],
             backing: .buffered,
             defer: false
@@ -367,7 +367,7 @@ private final class ShortcutSheetController: NSObject {
         conflictLabel.font = .systemFont(ofSize: 11)
         conflictLabel.textColor = .systemOrange
         conflictLabel.lineBreakMode = .byWordWrapping
-        conflictLabel.maximumNumberOfLines = 2
+        conflictLabel.maximumNumberOfLines = 3
         conflictLabel.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(conflictLabel)
 
@@ -419,10 +419,25 @@ private final class ShortcutSheetController: NSObject {
             conflictLabel.stringValue = ""
             return
         }
-        let owner = LayoutEditorAssignmentSheets.conflictOwner(for: result, among: taken)
-        conflictLabel.stringValue = owner.map {
-            "Already used by \($0). Whichever comes first in the profile will win."
-        } ?? ""
+        var warnings: [String] = []
+
+        if let owner = LayoutEditorAssignmentSheets.conflictOwner(for: result, among: taken) {
+            warnings.append("Already used by \(owner). Whichever comes first in the profile will win.")
+        }
+
+        // The event tap consumes what it matches, so taking a system shortcut
+        // removes it from every app, not just this one.
+        if let system = SystemShortcuts.conflict(with: result) {
+            warnings.append("This is the system shortcut for \(system). "
+                + "ScreenStay would take it over everywhere.")
+        }
+
+        if !KeyboardLayout.canProduce(result.key) {
+            warnings.append("No key on the current keyboard layout produces "
+                + "\u{201C}\(result.key)\u{201D}, so this shortcut would never fire.")
+        }
+
+        conflictLabel.stringValue = warnings.joined(separator: " ")
     }
 
     @objc private func clearShortcut() {

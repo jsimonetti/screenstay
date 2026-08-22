@@ -31,7 +31,15 @@ final class GlobalKeyboardHandler: @unchecked Sendable {
     func start(shortcuts: [KeyboardShortcut], onShortcutTriggered: @escaping @MainActor @Sendable (KeyboardShortcut) -> Void) {
         log("🎹 Starting keyboard handler with \(shortcuts.count) shortcuts")
         for shortcut in shortcuts {
-            log("  - Shortcut: \(shortcut.modifiers.joined(separator: "+"))+\(shortcut.key)")
+            var notes: [String] = []
+            if !KeyboardLayout.canProduce(shortcut.key) {
+                notes.append("NEVER FIRES: no key on the current layout produces '\(shortcut.key)'")
+            }
+            if let system = SystemShortcuts.conflict(with: shortcut) {
+                notes.append("takes over the system shortcut for \(system)")
+            }
+            let suffix = notes.isEmpty ? "" : "  <- " + notes.joined(separator: "; ")
+            log("  - Shortcut: \(shortcut.modifiers.joined(separator: "+"))+\(shortcut.key)\(suffix)")
         }
 
         // Stop existing tap if any
@@ -138,8 +146,8 @@ final class GlobalKeyboardHandler: @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
 
-        let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
-        guard let character = Self.keyCodeMap[keyCode] else {
+        let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
+        guard let character = KeyboardLayout.character(for: keyCode) else {
             return Unmanaged.passUnretained(event)
         }
 
@@ -154,6 +162,14 @@ final class GlobalKeyboardHandler: @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
 
+        // Swallow auto-repeats without acting on them. Holding a shortcut would
+        // otherwise re-fire at the system repeat rate, spinning the switcher.
+        // The repeat is still consumed: letting it through would deliver the
+        // focused app a stream of repeats whose initial press it never saw.
+        guard event.getIntegerValueField(.keyboardEventAutorepeat) == 0 else {
+            return nil
+        }
+
         // Deliver on the main actor; logging happens there too, off this thread.
         Task { @MainActor in
             log("🎯 Shortcut matched: \(match.modifiers.joined(separator: "+"))+\(match.key)")
@@ -164,24 +180,31 @@ final class GlobalKeyboardHandler: @unchecked Sendable {
         return nil
     }
 
-    private static func matches(_ shortcut: KeyboardShortcut, flags: CGEventFlags, character: String) -> Bool {
+    /// Modifiers a shortcut can name. Everything else in `CGEventFlags` is
+    /// masked away before comparing: Caps Lock, Fn, the numeric pad bit and the
+    /// help bit are all states a user may be in for unrelated reasons.
+    static let significantModifiers: CGEventFlags =
+        [.maskCommand, .maskShift, .maskAlternate, .maskControl]
+
+    static func requiredFlags(for shortcut: KeyboardShortcut) -> CGEventFlags {
         var required: CGEventFlags = []
         if shortcut.modifiers.contains("cmd") { required.insert(.maskCommand) }
         if shortcut.modifiers.contains("shift") { required.insert(.maskShift) }
         if shortcut.modifiers.contains("option") { required.insert(.maskAlternate) }
         if shortcut.modifiers.contains("control") { required.insert(.maskControl) }
-
-        return flags.contains(required) && character == shortcut.key.lowercased()
+        return required
     }
 
-    /// Key codes ScreenStay accepts as shortcut keys.
-    private static let keyCodeMap: [Int: String] = [
-        0: "a", 1: "s", 2: "d", 3: "f", 4: "h", 5: "g", 6: "z", 7: "x", 8: "c", 9: "v",
-        11: "b", 12: "q", 13: "w", 14: "e", 15: "r", 16: "y", 17: "t",
-        31: "o", 32: "u", 34: "i", 35: "p",
-        37: "l", 38: "j", 40: "k",
-        45: "n", 46: "m"
-    ]
+    /// Exact match on the significant modifiers.
+    ///
+    /// This used to be a subset test, so a shortcut of cmd+control also fired on
+    /// cmd+control+shift and consumed it. Equality is only safe once the
+    /// irrelevant flags are masked off, or Caps Lock alone would stop every
+    /// shortcut working.
+    static func matches(_ shortcut: KeyboardShortcut, flags: CGEventFlags, character: String) -> Bool {
+        flags.intersection(significantModifiers) == requiredFlags(for: shortcut)
+            && character == shortcut.key.lowercased()
+    }
 
     // MARK: - Failure reporting
 

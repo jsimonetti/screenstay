@@ -88,32 +88,46 @@ class KeyboardShortcutRecorder: NSView {
     
     override func keyDown(with event: NSEvent) {
         guard isRecording else { return }
-        
+
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        let key = event.charactersIgnoringModifiers ?? ""
-        
-        // Ignore modifier-only presses
-        guard !key.isEmpty else { return }
-        
+
+        // Resolve through the same layout table the event tap uses rather than
+        // charactersIgnoringModifiers. The two disagreed: this accepted any key,
+        // including function keys and arrows, while the tap could only ever
+        // match a hardcoded set of letters, so those shortcuts saved fine and
+        // then silently never fired.
+        guard let key = KeyboardLayout.character(for: CGKeyCode(event.keyCode)) else {
+            NSSound.beep()
+            rejectionReason = "That key cannot be used as a shortcut."
+            updateDisplay()
+            return
+        }
+
         // Extract modifier keys
         var modifierList: [String] = []
         if modifiers.contains(.control) { modifierList.append("control") }
         if modifiers.contains(.option) { modifierList.append("option") }
         if modifiers.contains(.shift) { modifierList.append("shift") }
         if modifiers.contains(.command) { modifierList.append("cmd") }
-        
+
         // Require at least one modifier
         guard !modifierList.isEmpty else {
             NSSound.beep()
+            rejectionReason = "A shortcut needs at least one modifier key."
+            updateDisplay()
             return
         }
-        
+
+        rejectionReason = nil
         currentModifiers = modifierList
         currentKey = key
-        
+
         stopRecording()
         onShortcutChanged((modifiers: currentModifiers, key: currentKey))
     }
+
+    /// Why the last key press was not accepted, shown until the next attempt.
+    private(set) var rejectionReason: String?
     
     override func flagsChanged(with event: NSEvent) {
         // Just for visual feedback while recording

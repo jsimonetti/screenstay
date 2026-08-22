@@ -20,30 +20,30 @@ actor WindowPositionEnforcer {
         return windowEventMonitor
     }
     
-    /// Reposition and resize a window to match a region
-    /// Respects app minimum/maximum size constraints
+    /// Reposition and resize a window to match a region.
+    ///
+    /// The app has the final say on the result: many apps enforce a minimum
+    /// size or a fixed aspect ratio and will simply ignore part of what we ask
+    /// for. We set what the region calls for and accept whatever comes back.
     @MainActor
     func enforceRegion(_ region: Region, for app: NSRunningApplication, window: AXUIElement? = nil) async {
         let targetWindow = window ?? accessibilityService.getFrontmostWindow(for: app)
-        
+
         guard let targetWindow = targetWindow else {
             return
         }
-        
+
         // Filter out system dialogs, sheets, and floating windows
         guard accessibilityService.shouldPositionWindow(targetWindow) else {
             return
         }
-        
-        // Apply padding to the region frame
-        let padding = region.padding
-        let targetFrame = CGRect(
-            x: region.frame.origin.x + padding,
-            y: region.frame.origin.y + padding,
-            width: region.frame.width - (padding * 2),
-            height: region.frame.height - (padding * 2)
-        )
-        
+
+        // Resolve the region against the display it names, then apply padding.
+        guard let targetFrame = RegionGeometry.contentAXFrame(for: region) else {
+            log("Cannot place '\(app.bundleIdentifier ?? "?")': region '\(region.name)' has no attached display")
+            return
+        }
+
         // Get monitor reference from actor context
         let monitor = await getWindowEventMonitor()
         

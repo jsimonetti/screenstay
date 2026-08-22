@@ -1,17 +1,27 @@
 {
   "globalSettings" : {
+    "appSwitcherScale" : 1,
     "enableAutoProfileSwitch" : true,
+    "focusWindowShortcut" : {
+      "key" : "f",
+      "modifiers" : [
+        "cmd",
+        "option"
+      ]
+    },
+    "focusedWindowBorderColor" : "#FF6B00",
+    "focusedWindowBorderWidth" : 4,
     "repositionOnAppLaunch" : true,
     "repositionOnDisplayChange" : true,
     "requireConfirmToLaunchApps" : false,
     "resetWindowShortcut" : {
-      "modifiers" : ["cmd", "option"],
-      "key" : "r"
+      "key" : "r",
+      "modifiers" : [
+        "cmd",
+        "option"
+      ]
     },
-    "focusWindowShortcut" : {
-      "modifiers" : ["cmd", "option"],
-      "key" : "f"
-    }
+    "showFocusedWindowBorder" : false
   },
   "profiles" : [
     {
@@ -20,6 +30,7 @@
           {
             "displayID" : 3,
             "isBuiltIn" : false,
+            "key" : "ext:v1129-m14859-s16843009",
             "position" : [
               0,
               0
@@ -32,6 +43,7 @@
           {
             "displayID" : 1,
             "isBuiltIn" : true,
+            "key" : "builtin",
             "position" : [
               -1728,
               0
@@ -44,9 +56,6 @@
         ],
         "externalMonitorCount" : 1
       },
-      "floatingWindows" : [
-
-      ],
       "id" : "PROFILE-UUID-1",
       "name" : "Ultrawide Home",
       "regions" : [
@@ -54,18 +63,9 @@
           "assignedApps" : [
             "chat.rocket"
           ],
-          "displayID" : 3,
-          "frame" : [
-            [
-              0,
-              28
-            ],
-            [
-              1138,
-              720
-            ]
-          ],
+          "displayKey" : "ext:v1129-m14859-s16843009",
           "id" : "UW-LEFT-TOP",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "z",
             "modifiers" : [
@@ -75,24 +75,25 @@
             ]
           },
           "name" : "Left Top",
-          "padding" : 3
+          "padding" : 3,
+          "relativeFrame" : [
+            [
+              0,
+              28
+            ],
+            [
+              1138,
+              720
+            ]
+          ]
         },
         {
           "assignedApps" : [
             "com.apple.finder"
           ],
-          "displayID" : 3,
-          "frame" : [
-            [
-              0,
-              751
-            ],
-            [
-              1138,
-              689
-            ]
-          ],
+          "displayKey" : "ext:v1129-m14859-s16843009",
           "id" : "UW-LEFT-BOTTOM",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "x",
             "modifiers" : [
@@ -102,7 +103,17 @@
             ]
           },
           "name" : "Left Bottom",
-          "padding" : 3
+          "padding" : 3,
+          "relativeFrame" : [
+            [
+              0,
+              751
+            ],
+            [
+              1138,
+              689
+            ]
+          ]
         },
         {
           "assignedApps" : [
@@ -111,18 +122,9 @@
             "com.mitchellh.ghostty",
             "md.obsidian"
           ],
-          "displayID" : 3,
-          "frame" : [
-            [
-              1138,
-              0
-            ],
-            [
-              2276,
-              1440
-            ]
-          ],
+          "displayKey" : "ext:v1129-m14859-s16843009",
           "id" : "UW-CENTER",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "c",
             "modifiers" : [
@@ -132,7 +134,17 @@
             ]
           },
           "name" : "Center",
-          "padding" : 3
+          "padding" : 3,
+          "relativeFrame" : [
+            [
+              1138,
+              0
+            ],
+            [
+              2276,
+              1440
+            ]
+          ]
         },
         {
           "assignedApps" : [
@@ -141,18 +153,9 @@
             "com.microsoft.Excel",
             "com.microsoft.Powerpoint"
           ],
-          "displayID" : 3,
-          "frame" : [
-            [
-              3414,
-              0
-            ],
-            [
-              1706,
-              1440
-            ]
-          ],
+          "displayKey" : "ext:v1129-m14859-s16843009",
           "id" : "UW-RIGHT",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "v",
             "modifiers" : [
@@ -162,25 +165,26 @@
             ]
           },
           "name" : "Right",
-          "padding" : 3
+          "padding" : 3,
+          "relativeFrame" : [
+            [
+              3414,
+              0
+            ],
+            [
+              1706,
+              1440
+            ]
+          ]
         },
         {
           "assignedApps" : [
             "com.apple.mail",
             "com.apple.iCal"
           ],
-          "displayID" : 1,
-          "frame" : [
-            [
-              -1728,
-              0
-            ],
-            [
-              1728,
-              1117
-            ]
-          ],
+          "displayKey" : "builtin",
           "id" : "MACBOOK-FULLSCREEN",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "b",
             "modifiers" : [
@@ -190,7 +194,17 @@
             ]
           },
           "name" : "MacBook - Fullscreen",
-          "padding" : 0
+          "padding" : 0,
+          "relativeFrame" : [
+            [
+              0,
+              0
+            ],
+            [
+              1728,
+              1117
+            ]
+          ]
         }
       ]
     },
@@ -200,6 +214,7 @@
           {
             "displayID" : 1,
             "isBuiltIn" : true,
+            "key" : "builtin",
             "position" : [
               -1728,
               483
@@ -212,6 +227,7 @@
           {
             "displayID" : 3,
             "isBuiltIn" : false,
+            "key" : "ext:v4268-m41168-s1052688",
             "position" : [
               0,
               0
@@ -224,9 +240,6 @@
         ],
         "externalMonitorCount" : 1
       },
-      "floatingWindows" : [
-
-      ],
       "id" : "PROFILE-UUID-2",
       "name" : "Work Display",
       "regions" : [
@@ -234,18 +247,9 @@
           "assignedApps" : [
             "chat.rocket"
           ],
-          "displayID" : 3,
-          "frame" : [
-            [
-              0,
-              28
-            ],
-            [
-              1200,
-              800
-            ]
-          ],
+          "displayKey" : "ext:v4268-m41168-s1052688",
           "id" : "UW-LEFT-TOP",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "Z",
             "modifiers" : [
@@ -255,24 +259,25 @@
             ]
           },
           "name" : "Left Top",
-          "padding" : 3
+          "padding" : 3,
+          "relativeFrame" : [
+            [
+              0,
+              28
+            ],
+            [
+              1200,
+              800
+            ]
+          ]
         },
         {
           "assignedApps" : [
             "com.apple.finder"
           ],
-          "displayID" : 3,
-          "frame" : [
-            [
-              0,
-              828
-            ],
-            [
-              1200,
-              770
-            ]
-          ],
+          "displayKey" : "ext:v4268-m41168-s1052688",
           "id" : "UW-LEFT-BOTTOM",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "x",
             "modifiers" : [
@@ -282,7 +287,17 @@
             ]
           },
           "name" : "Left Bottom",
-          "padding" : 3
+          "padding" : 3,
+          "relativeFrame" : [
+            [
+              0,
+              828
+            ],
+            [
+              1200,
+              770
+            ]
+          ]
         },
         {
           "assignedApps" : [
@@ -291,18 +306,9 @@
             "com.mitchellh.ghostty",
             "md.obsidian"
           ],
-          "displayID" : 3,
-          "frame" : [
-            [
-              1200,
-              28
-            ],
-            [
-              2240,
-              1572
-            ]
-          ],
+          "displayKey" : "ext:v4268-m41168-s1052688",
           "id" : "UW-CENTER",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "c",
             "modifiers" : [
@@ -312,7 +318,17 @@
             ]
           },
           "name" : "Center",
-          "padding" : 3
+          "padding" : 3,
+          "relativeFrame" : [
+            [
+              1200,
+              28
+            ],
+            [
+              2240,
+              1572
+            ]
+          ]
         },
         {
           "assignedApps" : [
@@ -321,18 +337,9 @@
             "com.microsoft.Excel",
             "com.microsoft.Powerpoint"
           ],
-          "displayID" : 3,
-          "frame" : [
-            [
-              2000,
-              28
-            ],
-            [
-              1840,
-              1572
-            ]
-          ],
+          "displayKey" : "ext:v4268-m41168-s1052688",
           "id" : "UW-RIGHT",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "v",
             "modifiers" : [
@@ -342,25 +349,26 @@
             ]
           },
           "name" : "Right",
-          "padding" : 3
+          "padding" : 3,
+          "relativeFrame" : [
+            [
+              2000,
+              28
+            ],
+            [
+              1840,
+              1572
+            ]
+          ]
         },
         {
           "assignedApps" : [
             "com.apple.mail",
             "com.apple.iCal"
           ],
-          "displayID" : 1,
-          "frame" : [
-            [
-              -1728,
-              0
-            ],
-            [
-              1728,
-              1117
-            ]
-          ],
+          "displayKey" : "builtin",
           "id" : "MACBOOK-FULLSCREEN",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "b",
             "modifiers" : [
@@ -370,7 +378,17 @@
             ]
           },
           "name" : "MacBook - Fullscreen",
-          "padding" : 0
+          "padding" : 0,
+          "relativeFrame" : [
+            [
+              0,
+              0
+            ],
+            [
+              1728,
+              1117
+            ]
+          ]
         }
       ]
     },
@@ -380,6 +398,7 @@
           {
             "displayID" : 1,
             "isBuiltIn" : true,
+            "key" : "builtin",
             "position" : [
               0,
               0
@@ -392,9 +411,6 @@
         ],
         "externalMonitorCount" : 0
       },
-      "floatingWindows" : [
-
-      ],
       "id" : "PROFILE-UUID-3",
       "name" : "Laptop Only",
       "regions" : [
@@ -402,18 +418,9 @@
           "assignedApps" : [
             "chat.rocket"
           ],
-          "displayID" : 1,
-          "frame" : [
-            [
-              0,
-              28
-            ],
-            [
-              1102,
-              672
-            ]
-          ],
+          "displayKey" : "builtin",
           "id" : "UW-LEFT-TOP",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "Z",
             "modifiers" : [
@@ -423,24 +430,25 @@
             ]
           },
           "name" : "Left Top",
-          "padding" : 3
+          "padding" : 3,
+          "relativeFrame" : [
+            [
+              0,
+              28
+            ],
+            [
+              1102,
+              672
+            ]
+          ]
         },
         {
           "assignedApps" : [
             "com.apple.finder"
           ],
-          "displayID" : 1,
-          "frame" : [
-            [
-              0,
-              412
-            ],
-            [
-              1090,
-              673
-            ]
-          ],
+          "displayKey" : "builtin",
           "id" : "UW-LEFT-BOTTOM",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "x",
             "modifiers" : [
@@ -450,7 +458,17 @@
             ]
           },
           "name" : "Left Bottom",
-          "padding" : 3
+          "padding" : 3,
+          "relativeFrame" : [
+            [
+              0,
+              412
+            ],
+            [
+              1090,
+              673
+            ]
+          ]
         },
         {
           "assignedApps" : [
@@ -459,18 +477,9 @@
             "com.mitchellh.ghostty",
             "md.obsidian"
           ],
-          "displayID" : 1,
-          "frame" : [
-            [
-              0,
-              28
-            ],
-            [
-              1734,
-              1084
-            ]
-          ],
+          "displayKey" : "builtin",
           "id" : "UW-CENTER",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "c",
             "modifiers" : [
@@ -480,7 +489,17 @@
             ]
           },
           "name" : "Center",
-          "padding" : 3
+          "padding" : 3,
+          "relativeFrame" : [
+            [
+              0,
+              28
+            ],
+            [
+              1728,
+              1084
+            ]
+          ]
         },
         {
           "assignedApps" : [
@@ -489,18 +508,9 @@
             "com.microsoft.Excel",
             "com.microsoft.Powerpoint"
           ],
-          "displayID" : 1,
-          "frame" : [
-            [
-              0,
-              28
-            ],
-            [
-              1734,
-              1084
-            ]
-          ],
+          "displayKey" : "builtin",
           "id" : "UW-RIGHT",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "v",
             "modifiers" : [
@@ -510,25 +520,26 @@
             ]
           },
           "name" : "Right",
-          "padding" : 3
+          "padding" : 3,
+          "relativeFrame" : [
+            [
+              0,
+              28
+            ],
+            [
+              1728,
+              1084
+            ]
+          ]
         },
         {
           "assignedApps" : [
             "com.apple.mail",
             "com.apple.iCal"
           ],
-          "displayID" : 1,
-          "frame" : [
-            [
-              0,
-              28
-            ],
-            [
-              1734,
-              1084
-            ]
-          ],
+          "displayKey" : "builtin",
           "id" : "MACBOOK-FULLSCREEN",
+          "isFocusRegion" : false,
           "keyboardShortcut" : {
             "key" : "b",
             "modifiers" : [
@@ -538,10 +549,20 @@
             ]
           },
           "name" : "MacBook - Fullscreen",
-          "padding" : 0
+          "padding" : 0,
+          "relativeFrame" : [
+            [
+              0,
+              28
+            ],
+            [
+              1728,
+              1084
+            ]
+          ]
         }
       ]
     }
   ],
-  "version" : "1.0"
+  "version" : "2.0"
 }

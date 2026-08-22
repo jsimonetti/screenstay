@@ -33,16 +33,13 @@ class FocusRegionManager {
         }
         
         let currentFrame = CGRect(origin: currentPosition, size: currentSize)
-        
-        // Apply padding to focus region frame
-        let padding = region.padding
-        let targetFrame = CGRect(
-            x: region.frame.origin.x + padding,
-            y: region.frame.origin.y + padding,
-            width: region.frame.width - (padding * 2),
-            height: region.frame.height - (padding * 2)
-        )
-        
+
+        // Resolve the focus region against its display, then apply padding
+        guard let targetFrame = RegionGeometry.contentAXFrame(for: region) else {
+            log("Cannot focus window: region '\(region.name)' has no attached display")
+            return
+        }
+
         // Store state
         focusedWindow = window
         focusedWindowID = windowID

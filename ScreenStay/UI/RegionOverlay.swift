@@ -14,24 +14,34 @@ class RegionOverlayWindow: NSWindow {
         case none, top, bottom, left, right, topLeft, topRight, bottomLeft, bottomRight
     }
     
-    init(region: Region) {
+    /// - Parameter cocoaFrame: the region's absolute frame in Cocoa space,
+    ///   already resolved against its display by `RegionGeometry`.
+    init(region: Region, cocoaFrame: CGRect) {
         self.region = region
-        
+
         super.init(
-            contentRect: region.frame,
+            contentRect: cocoaFrame,
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
-        
+
         self.level = .floating
         self.isOpaque = false
         self.backgroundColor = .clear
         self.ignoresMouseEvents = false
         self.collectionBehavior = [.canJoinAllSpaces, .stationary]
         self.isMovableByWindowBackground = true
-        
+
         setupOverlay()
+    }
+
+    /// Show the overlay exactly where the region is, including under the menu
+    /// bar. The default implementation pushes windows clear of the menu bar,
+    /// which would silently shift the frame we later read back as the region's
+    /// new geometry.
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        return frameRect
     }
     
     private func setupOverlay() {
@@ -187,11 +197,12 @@ class BackgroundOverlayWindow: NSWindow {
     var onDismiss: (() -> Void)?
     
     init() {
-        // Cover all screens
-        let mainScreen = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
-        
+        // Cover every screen, not just one
+        let union = NSScreen.screens.reduce(CGRect.null) { $0.union($1.frame) }
+        let allScreens = union.isNull ? NSRect(x: 0, y: 0, width: 1920, height: 1080) : union
+
         super.init(
-            contentRect: mainScreen,
+            contentRect: allScreens,
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -238,7 +249,12 @@ class RegionOverlayManager {
         
         // Create region overlays
         for region in regions {
-            let overlay = RegionOverlayWindow(region: region)
+            guard let cocoaFrame = RegionGeometry.absoluteCocoaFrame(for: region) else {
+                log("Not showing overlay for region '\(region.name)': no attached display")
+                continue
+            }
+
+            let overlay = RegionOverlayWindow(region: region, cocoaFrame: cocoaFrame)
             overlay.onDismiss = { [weak self] in
                 self?.hideOverlays(saveChanges: true)
             }
@@ -246,19 +262,28 @@ class RegionOverlayManager {
             overlayWindows.append(overlay)
         }
     }
-    
+
     func hideOverlays(saveChanges: Bool = false) {
         // If saving changes, collect updated regions
         if saveChanges && !overlayWindows.isEmpty {
             var updatedRegions: [Region] = []
             for overlay in overlayWindows {
                 var region = overlay.region
-                region.frame = overlay.frame
-                updatedRegions.append(region)
+
+                // The overlay frame is in Cocoa space. Convert back to AX and
+                // rebase onto whichever display it now covers, so dragging a
+                // region to another monitor reassigns it rather than storing
+                // coordinates that belong to the old one.
+                let axFrame = CoordinateSpace.cocoaToAX(overlay.frame)
+                if let rebased = RegionGeometry.rebase(absoluteAX: axFrame) {
+                    region.displayKey = rebased.display.key
+                    region.relativeFrame = rebased.relativeFrame
+                    updatedRegions.append(region)
+                }
             }
             onRegionsUpdated?(updatedRegions)
         }
-        
+
         backgroundOverlay?.orderOut(nil)
         backgroundOverlay = nil
         

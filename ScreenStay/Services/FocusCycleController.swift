@@ -83,7 +83,9 @@ actor FocusCycleController {
         }
         switcherWindow?.setScale(scale)
         switcherWindow?.updateApps(apps, selectedIndex: initialIndex)
-        switcherWindow?.show(centeredIn: region.frame)
+        if let cocoaFrame = RegionGeometry.absoluteCocoaFrame(for: region) {
+            switcherWindow?.show(centeredIn: cocoaFrame)
+        }
         
         // Start monitoring for modifier release
         await startModifierMonitoring()

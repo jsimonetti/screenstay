@@ -1,20 +1,26 @@
 import AppKit
 
 /// Interactive region drawing overlay
+///
+/// Spans every attached display so a region can be drawn on any monitor, and
+/// reports the result in **AX space** to match how regions are stored.
 @MainActor
 class RegionDrawingOverlay: NSWindow {
     private var startPoint: NSPoint?
     private var currentRect: NSRect?
     private var onComplete: ((NSRect) -> Void)?
     private let drawingView: RegionDrawingView
-    
+
+    /// - Parameter onComplete: receives the drawn rect as an absolute frame in
+    ///   AX space (top-left origin), ready for `RegionGeometry.rebase`.
     init(onComplete: @escaping (NSRect) -> Void) {
         self.onComplete = onComplete
         self.drawingView = RegionDrawingView()
-        
-        // Get main screen bounds
-        let screenRect = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
-        
+
+        // Cover every display, so regions can be drawn on any of them
+        let union = NSScreen.screens.reduce(CGRect.null) { $0.union($1.frame) }
+        let screenRect = union.isNull ? NSRect(x: 0, y: 0, width: 1920, height: 1080) : union
+
         super.init(
             contentRect: screenRect,
             styleMask: [.borderless],
@@ -91,10 +97,16 @@ class RegionDrawingOverlay: NSWindow {
             return
         }
         
-        // Convert from window coordinates to screen coordinates
-        let screenRect = convertToScreen(NSRect(origin: rect.origin, size: rect.size))
-        onComplete?(screenRect)
+        // Window coordinates -> Cocoa screen coordinates -> AX space, which is
+        // what regions are stored in.
+        let cocoaRect = convertToScreen(NSRect(origin: rect.origin, size: rect.size))
+        onComplete?(CoordinateSpace.cocoaToAX(cocoaRect))
         close()
+    }
+
+    /// Keep the overlay covering the full desktop union, menu bar included.
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        return frameRect
     }
     
     override func keyDown(with event: NSEvent) {

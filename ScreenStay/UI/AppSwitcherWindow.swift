@@ -152,11 +152,13 @@ class AppSwitcherWindow: NSWindow {
     }
     
     /// Show the window centered in the given region
+    /// Show the switcher centred on a region, given the region's absolute frame
+    /// in **Cocoa** space. Callers resolve regions via `RegionGeometry`.
     func show(centeredIn regionFrame: CGRect) {
         let windowSize = frame.size
         let centerX = regionFrame.midX - (windowSize.width / 2)
         let centerY = regionFrame.midY - (windowSize.height / 2)
-        
+
         setFrameOrigin(NSPoint(x: centerX, y: centerY))
         orderFrontRegardless()
     }

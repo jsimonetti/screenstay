@@ -111,8 +111,15 @@ class AccessibilityService {
     }
     
     /// Set window frame (position + size)
+    ///
+    /// Applied as size, position, size. A single position-then-size pass is
+    /// unreliable when the window is moving between displays of different
+    /// sizes: the move is evaluated while the window still has its old
+    /// dimensions, so the window server or the app itself may refuse or adjust
+    /// it. Shrinking first makes the move always legal, and the trailing resize
+    /// re-applies the target size in case the app clamped it during the move.
     func setWindowFrame(_ window: AXUIElement, to frame: CGRect) {
-        // Set position first, then size
+        setWindowSize(window, to: frame.size)
         setWindowPosition(window, to: frame.origin)
         setWindowSize(window, to: frame.size)
     }

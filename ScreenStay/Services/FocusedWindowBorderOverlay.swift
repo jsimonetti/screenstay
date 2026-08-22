@@ -36,10 +36,12 @@ class FocusedWindowBorderOverlay {
         updateBorder()
     }
     
-    /// Stop showing borders
+    /// Stop showing borders and release the border windows
     func stop() {
         removeWindowObserver()
         hideBorder()
+        borderWindows.removeAll()
+        invalidateScreenCache()
         currentTrackedWindow = nil
     }
     
@@ -107,27 +109,23 @@ class FocusedWindowBorderOverlay {
     }
     
     private func showBorder(around frame: CGRect) {
-        let width = CGFloat(borderWidth)
-        
-        // Get the main screen (primary display) for coordinate conversion
-        guard let mainScreen = NSScreen.main else { return }
-        let mainScreenHeight = mainScreen.frame.height
-        
-        // Convert window frame from Accessibility coordinates (top-left origin) to NSScreen coordinates (bottom-left origin)
-        // In Accessibility API: (0,0) is top-left of main screen
-        // In NSScreen API: (0,0) is bottom-left of main screen
-        let convertedY = mainScreenHeight - frame.origin.y - frame.height
-        let convertedFrame = CGRect(x: frame.origin.x, y: convertedY, width: frame.width, height: frame.height)
-        
-        // Find which screen contains this window (now in NSScreen coordinates)
+        // Never let the border eat the whole window on a very small one.
+        let width = min(CGFloat(borderWidth), max(1, min(frame.width, frame.height) / 2))
+
+        // The Accessibility frame is in AX space; AppKit wants Cocoa space. The
+        // flip pivots on the *primary* display, which CoordinateSpace knows and
+        // which is not the same thing as NSScreen.main.
+        let convertedFrame = CoordinateSpace.axToCocoa(frame)
+
+        // Find which screen the window sits on, for clamping.
         let windowCenter = CGPoint(x: convertedFrame.midX, y: convertedFrame.midY)
-        
+
         // Try cached screen first for performance
         var targetScreen: NSScreen?
         if let lastScreen = lastWindowScreen, lastScreen.frame.contains(windowCenter) {
             targetScreen = lastScreen
         }
-        
+
         // If not on cached screen, find the correct one
         if targetScreen == nil {
             for screen in NSScreen.screens {
@@ -138,18 +136,22 @@ class FocusedWindowBorderOverlay {
                 }
             }
         }
-        
-        let screen = targetScreen ?? mainScreen
-        cachedScreenBounds = screen.frame
-        
-        // Create 4 border windows (top, right, bottom, left), clamped to screen bounds
-        let borders: [(CGRect, String)] = [
-            (CGRect(x: convertedFrame.origin.x, y: convertedFrame.maxY, width: convertedFrame.width, height: width), "top"),
-            (CGRect(x: convertedFrame.maxX - width, y: convertedFrame.origin.y, width: width, height: convertedFrame.height), "right"),
-            (CGRect(x: convertedFrame.origin.x, y: convertedFrame.origin.y - width, width: convertedFrame.width, height: width), "bottom"),
-            (CGRect(x: convertedFrame.origin.x, y: convertedFrame.origin.y, width: width, height: convertedFrame.height), "left")
+
+        // A window straddling two displays should still get a border, so fall
+        // back to the union of all screens rather than to one arbitrary screen.
+        cachedScreenBounds = targetScreen?.frame
+            ?? NSScreen.screens.reduce(CGRect.null) { $0.union($1.frame) }
+
+        // All four edges are drawn *inside* the window frame. Drawing them
+        // outside would put them off-screen for any maximised window, where the
+        // clamp below would then delete them entirely.
+        let borders: [CGRect] = [
+            CGRect(x: convertedFrame.minX, y: convertedFrame.maxY - width, width: convertedFrame.width, height: width),
+            CGRect(x: convertedFrame.maxX - width, y: convertedFrame.minY, width: width, height: convertedFrame.height),
+            CGRect(x: convertedFrame.minX, y: convertedFrame.minY, width: convertedFrame.width, height: width),
+            CGRect(x: convertedFrame.minX, y: convertedFrame.minY, width: width, height: convertedFrame.height)
         ]
-        
+
         // Create windows if they don't exist, otherwise reuse
         if borderWindows.isEmpty {
             for _ in 0..<4 {
@@ -172,31 +174,38 @@ class FocusedWindowBorderOverlay {
         }
         
         // Update window frames and colors
-        for (index, (borderFrame, _)) in borders.enumerated() {
+        for (index, borderFrame) in borders.enumerated() {
             guard index < borderWindows.count else { break }
             let window = borderWindows[index]
-            
+
             // Clamp border to screen bounds
             let clampedFrame = borderFrame.intersection(cachedScreenBounds)
-            
+
             // Hide if border is completely outside screen
-            if clampedFrame.isEmpty {
+            if clampedFrame.isNull || clampedFrame.isEmpty {
                 window.orderOut(nil)
                 continue
             }
-            
+
             // Update frame and show
             window.setFrame(clampedFrame, display: false)
             window.backgroundColor = borderColor
             window.orderFrontRegardless()
         }
     }
-    
+
+    /// Hide the border, keeping the windows around to be reused.
     private func hideBorder() {
         for window in borderWindows {
             window.orderOut(nil)
         }
-        borderWindows.removeAll()
+    }
+
+    /// Drop the cached screen after a display reconfiguration, since the
+    /// `NSScreen` instances and their frames are no longer valid.
+    func invalidateScreenCache() {
+        lastWindowScreen = nil
+        cachedScreenBounds = .zero
     }
     
     // MARK: - Accessibility Notifications

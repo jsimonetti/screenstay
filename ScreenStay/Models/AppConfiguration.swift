@@ -71,7 +71,7 @@ struct AppConfiguration: Codable, Sendable {
     }
     
     init(
-        version: String = "1.0",
+        version: String = ConfigurationMigration.currentVersion,
         profiles: [Profile] = [],
         globalSettings: GlobalSettings = .default
     ) {

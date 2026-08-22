@@ -79,11 +79,10 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
         
         displayIDPopup.translatesAutoresizingMaskIntoConstraints = false
         for display in displayTopology.displays {
-            let title = display.isBuiltIn ? 
-                "Display \(display.displayID) (Built-in) - \(Int(display.resolution.width))x\(Int(display.resolution.height))" :
-                "Display \(display.displayID) (External) - \(Int(display.resolution.width))x\(Int(display.resolution.height))"
-            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-            item.representedObject = display.displayID
+            guard let key = display.key else { continue }
+            let item = NSMenuItem(title: Self.title(for: display), action: nil, keyEquivalent: "")
+            // Keyed by stable identity, not by the volatile CGDirectDisplayID.
+            item.representedObject = key
             displayIDPopup.menu?.addItem(item)
         }
         stackView.addArrangedSubview(displayIDPopup)
@@ -97,7 +96,7 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
         frameHeaderStack.orientation = .horizontal
         frameHeaderStack.spacing = 12
         
-        let frameLabel = NSTextField(labelWithString: "Frame (x, y, width, height):")
+        let frameLabel = NSTextField(labelWithString: "Frame relative to display (x, y, width, height):")
         frameLabel.font = .systemFont(ofSize: 13, weight: .semibold)
         frameHeaderStack.addArrangedSubview(frameLabel)
         
@@ -247,27 +246,37 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
         ])
     }
     
+    /// Menu title for a display in this profile's topology.
+    private static func title(for display: DisplayTopology.DisplayInfo) -> String {
+        let size = "\(Int(display.resolution.width))x\(Int(display.resolution.height))"
+        let kind = display.isBuiltIn ? "Built-in" : "External"
+        return "\(display.name ?? kind) - \(size)"
+    }
+
     private func populateFields(with region: Region) {
         nameField.stringValue = region.name
-        
-        // Select the display in popup
-        if let index = displayTopology.displays.firstIndex(where: { $0.displayID == region.displayID }) {
-            displayIDPopup.selectItem(at: index)
+
+        // Select the display by stable key. If the region points at a display
+        // this profile no longer describes, surface that instead of silently
+        // falling through to whichever display happens to be listed first.
+        if let key = region.displayKey {
+            if let index = displayTopology.displays.firstIndex(where: { $0.key == key }) {
+                displayIDPopup.selectItem(at: index)
+            } else {
+                let item = NSMenuItem(title: "Unknown display (\(key))", action: nil, keyEquivalent: "")
+                item.representedObject = key
+                displayIDPopup.menu?.addItem(item)
+                displayIDPopup.select(item)
+            }
         }
-        
-        // Parse frame - handle both direct values and nested arrays
-        let frame = region.frame
-        let xVal = "\(Int(frame.origin.x))"
-        let yVal = "\(Int(frame.origin.y))"
-        let wVal = "\(Int(frame.width))"
-        let hVal = "\(Int(frame.height))"
-        
-        xField.stringValue = xVal
-        yField.stringValue = yVal
-        widthField.stringValue = wVal
-        heightField.stringValue = hVal
+
+        let frame = region.relativeFrame
+        xField.stringValue = "\(Int(frame.origin.x))"
+        yField.stringValue = "\(Int(frame.origin.y))"
+        widthField.stringValue = "\(Int(frame.width))"
+        heightField.stringValue = "\(Int(frame.height))"
         paddingField.stringValue = "\(Int(region.padding))"
-        
+
         if let shortcut = region.keyboardShortcut {
             shortcutRecorder.setShortcut(modifiers: shortcut.modifiers, key: shortcut.key)
         }
@@ -277,16 +286,30 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
         // Hide this dialog temporarily
         window?.orderOut(nil)
         
-        // Show drawing overlay
+        // Show drawing overlay. It reports an absolute AX rect, which has to be
+        // rebased onto whichever display it was drawn on before it can be
+        // stored, and that display becomes the region's display.
         let overlay = RegionDrawingOverlay { [weak self] drawnRect in
             guard let self = self else { return }
-            
-            // Update fields with drawn rectangle
-            self.xField.stringValue = "\(Int(drawnRect.origin.x))"
-            self.yField.stringValue = "\(Int(drawnRect.origin.y))"
-            self.widthField.stringValue = "\(Int(drawnRect.width))"
-            self.heightField.stringValue = "\(Int(drawnRect.height))"
-            
+
+            guard let rebased = RegionGeometry.rebase(absoluteAX: drawnRect) else {
+                self.showAlert(message: "Could not work out which display that region was drawn on")
+                return
+            }
+
+            let relative = rebased.relativeFrame
+            self.xField.stringValue = "\(Int(relative.origin.x))"
+            self.yField.stringValue = "\(Int(relative.origin.y))"
+            self.widthField.stringValue = "\(Int(relative.width))"
+            self.heightField.stringValue = "\(Int(relative.height))"
+
+            // Point the region at the display it was drawn on.
+            if let index = self.displayIDPopup.itemArray.firstIndex(where: {
+                $0.representedObject as? String == rebased.display.key
+            }) {
+                self.displayIDPopup.selectItem(at: index)
+            }
+
             // Show dialog again after a brief delay to ensure overlay is fully closed
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.window?.makeKeyAndOrderFront(nil)
@@ -401,7 +424,7 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
         }
         
         guard let selectedItem = displayIDPopup.selectedItem,
-              let displayID = selectedItem.representedObject as? CGDirectDisplayID else {
+              let displayKey = selectedItem.representedObject as? String else {
             showAlert(message: "Please select a display")
             return
         }
@@ -432,8 +455,8 @@ class RegionEditorDialog: NSWindowController, NSTableViewDelegate, NSTableViewDa
         let newRegion = Region(
             id: region?.id ?? UUID().uuidString,
             name: nameField.stringValue,
-            displayID: displayID,
-            frame: frame,
+            displayKey: displayKey,
+            relativeFrame: frame,
             assignedApps: appBundleIDs.filter { !$0.isEmpty },
             keyboardShortcut: shortcut,
             padding: padding,

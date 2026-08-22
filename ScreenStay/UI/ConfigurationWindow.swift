@@ -211,8 +211,9 @@ class ConfigurationWindow: NSWindowController {
             guard !name.isEmpty else { return }
             
             // Capture current display topology
-            let topology = DisplayCapture.captureCurrentTopology()
-            
+            DisplayRegistry.shared.refresh()
+            let topology = DisplayTopology.current()
+
             // Create new profile
             let newProfile = Profile(
                 id: UUID().uuidString,
@@ -263,26 +264,46 @@ class ConfigurationWindow: NSWindowController {
     }
     
     @objc private func captureDisplays() {
-        let topology = DisplayCapture.captureCurrentTopology()
+        DisplayRegistry.shared.refresh()
+        let topology = DisplayTopology.current()
         let description = DisplayCapture.describeTopology(topology)
-        
+
+        let selectedRow = profilesTableView.selectedRow
+        guard selectedRow >= 0, let profile = config?.profiles[safe: selectedRow] else {
+            showAlert(message: "Please select a profile to update")
+            return
+        }
+
+        // Warn when the profile describes different hardware: its regions point
+        // at displays that are not in the new topology, so they would all have
+        // to be reassigned by hand.
+        let match = profile.match(against: topology)
+        let warning = match == nil
+            ? "\n\nWarning: this profile currently describes a different set of displays. "
+                + "Its regions will need to be reassigned to the new displays."
+            : ""
+
         let alert = NSAlert()
         alert.messageText = "Display Topology Captured"
-        alert.informativeText = "\(description)\n\nDo you want to update the selected profile with this topology?"
-        alert.alertStyle = .informational
+        alert.informativeText = "\(description)\n\nDo you want to update the selected profile with this topology?\(warning)"
+        alert.alertStyle = match == nil ? .warning : .informational
         alert.addButton(withTitle: "Update Profile")
         alert.addButton(withTitle: "Cancel")
-        
+
         let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            // Update selected profile
-            let selectedRow = profilesTableView.selectedRow
-            if selectedRow >= 0, var profile = config?.profiles[safe: selectedRow] {
-                profile.displayTopology = topology
-                config?.profiles[selectedRow] = profile
-                profilesTableView.reloadData()
-            }
+        guard response == .alertFirstButtonReturn else { return }
+
+        var updated = profile
+        if let match {
+            // Same displays: carry the regions over by rewriting their keys to
+            // the freshly captured identities.
+            _ = ConfigurationMigration.adoptLiveKeys(in: &updated, match: match, live: topology)
         }
+        updated.displayTopology = topology
+
+        config?.profiles[selectedRow] = updated
+        profilesTableView.reloadData()
+        regionsTableView.reloadData()
     }
     
     @objc private func activateProfile() {
@@ -574,7 +595,8 @@ class ConfigurationWindow: NSWindowController {
         // Update the regions in the profile
         for updatedRegion in updatedRegions {
             if let regionIndex = config.profiles[profileIndex].regions.firstIndex(where: { $0.id == updatedRegion.id }) {
-                config.profiles[profileIndex].regions[regionIndex].frame = updatedRegion.frame
+                config.profiles[profileIndex].regions[regionIndex].relativeFrame = updatedRegion.relativeFrame
+                config.profiles[profileIndex].regions[regionIndex].displayKey = updatedRegion.displayKey
             }
         }
         
@@ -1140,7 +1162,17 @@ extension ConfigurationWindow: NSTableViewDelegate, NSTableViewDataSource {
                 }
                 textField.stringValue = name
             } else if identifier.rawValue == "frame" {
-                textField.stringValue = "[\(Int(region.frame.origin.x)), \(Int(region.frame.origin.y))] [\(Int(region.frame.width)), \(Int(region.frame.height))]"
+                let frame = region.relativeFrame
+                let geometry = "[\(Int(frame.origin.x)), \(Int(frame.origin.y))] [\(Int(frame.width)), \(Int(frame.height))]"
+                // Coordinates are display-relative, so name the display too.
+                let displayName = region.displayKey.flatMap { key in
+                    config.profiles
+                        .first(where: { $0.id == selectedProfileID })?
+                        .displayTopology.displays
+                        .first(where: { $0.key == key })?
+                        .name
+                }
+                textField.stringValue = displayName.map { "\(geometry) on \($0)" } ?? geometry
             } else if identifier.rawValue == "shortcut" {
                 if let shortcut = region.keyboardShortcut {
                     let symbols = shortcut.modifiers.map { modifierToSymbol($0) }.joined()

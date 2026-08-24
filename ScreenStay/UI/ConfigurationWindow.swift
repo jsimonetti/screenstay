@@ -341,9 +341,40 @@ class ConfigurationWindow: NSWindowController {
         layoutEditor.globalShortcuts = globals
 
         layoutEditor.onSave = { [weak self] profileID, regions in
-            guard let self, let index = self.config?.profiles.firstIndex(where: { $0.id == profileID }) else { return }
-            self.config?.profiles[index].regions = regions
+            guard let self, var config = self.config,
+                  let index = config.profiles.firstIndex(where: { $0.id == profileID }) else { return }
+
+            config.profiles[index].regions = regions
+            self.config = config
             self.regionsTableView.reloadData()
+
+            // Write it out here rather than leaving it in memory for the Save
+            // Changes button. The editor has already asked whether to save and
+            // been told yes; anything less than persisting means the prompt
+            // lied, and closing Settings afterwards silently threw the work
+            // away.
+            Task {
+                await self.profileManager.updateConfiguration(config)
+                do {
+                    try await self.profileManager.save()
+                    log("Layout editor: saved \(regions.count) regions to "
+                        + "'\(config.profiles[index].name)'")
+
+                    // Re-apply, so the windows land in the layout just drawn and
+                    // any shortcut changes take effect.
+                    self.eventCoordinator?.stop()
+                    await self.eventCoordinator?.start()
+                } catch {
+                    log("Layout editor: save failed: \(error)")
+                    let alert = NSAlert()
+                    alert.messageText = "Could not save the layout"
+                    alert.informativeText = "\(error.localizedDescription)\n\n"
+                        + "The change is still here in Settings, so Save Changes may work."
+                    alert.alertStyle = .critical
+                    alert.addButton(withTitle: "OK")
+                    alert.runModal()
+                }
+            }
         }
 
         layoutEditor.onClose = { [weak self] in

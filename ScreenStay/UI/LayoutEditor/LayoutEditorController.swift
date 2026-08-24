@@ -23,15 +23,14 @@ final class LayoutEditorController {
         let originalRegions: [Region]
         var regions: [Region]
 
+        /// Region is Equatable, so compare it whole.
+        ///
+        /// This used to list the fields to compare by hand and had already
+        /// fallen behind: keyboardShortcut was missing, so changing only a
+        /// shortcut left the session looking clean and Escape closed it without
+        /// even offering to save.
         var isDirty: Bool {
-            guard regions.count == originalRegions.count else { return true }
-            return zip(regions, originalRegions).contains { current, original in
-                current.relativeFrame != original.relativeFrame
-                    || current.displayKey != original.displayKey
-                    || current.name != original.name
-                    || current.assignedApps != original.assignedApps
-                    || current.isFocusRegion != original.isFocusRegion
-            }
+            regions != originalRegions
         }
     }
 
